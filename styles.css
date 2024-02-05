@@ -34,6 +34,10 @@ body {
     max-height: auto; /* Make the image responsive */
 }
 
+audio {
+    display: none;
+}
+
 @media (max-width: 600px) { /* Adjust the max-width as needed for targeting mobile devices */
     body, html {
         margin: 0;
@@ -68,11 +72,13 @@ body {
         width: 50%; /* Set the image width to be 20% smaller than the screen */
         max-height: auto; /* Make the image responsive */
     }
+
+    audio {
+        display: none;
+    }
 }
 
-audio {
-    display: none;
-}
+
 
 #introductory-screen {
     position: fixed;
