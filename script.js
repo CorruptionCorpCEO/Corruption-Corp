@@ -1,5 +1,3 @@
-
-
 $(document).ready(function(e) {
     $('img[usemap]').rwdImageMaps();
 });
@@ -46,9 +44,6 @@ document.getElementById("dnote-area").addEventListener("click", function() {
     dnote.play();
 });
 
-$(document).ready(function () {
-    $('map').imageMapResize();
-});
 
 var image = document.getElementById("image");
         var originalSrc = image.src; // Store the original image source

@@ -12,13 +12,14 @@ body {
     align-items: center;
     width: 100%; /* Fill the width of the viewport */
     height: 100%; /* Fill the height of the viewport */
+}
+
+
+#main-asset {
     max-width: 100%; /* Limit image width to prevent overflow */
     max-height: 80vh; /* Limit image height with some space */
     object-fit: contain; /* Maintain aspect ratio */
 }
-
-
-
 
 #corner-icon {
     top: 0;
@@ -33,51 +34,49 @@ body {
     max-height: auto; /* Make the image responsive */
 }
 
-audio {
-    display: none;
-}
 
-@media (max-width: 600px) { /* Adjust the max-width as needed for targeting mobile devices */
-    body, html {
-        margin: 0;
-        height: 100vh;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-    }
+    @media (max-width: 600px) { /* Adjust the max-width as needed for targeting mobile devices */
 
-    #interactive {
-        width: 100vw; /* Full width of the viewport */
-        height: 100vh; /* Full height of the viewport, adjust if necessary */
-    }
+      
 
-    #main-asset {
-        max-width: 90%; /* Give some margin around the image */
-        max-height: 80vh; /* Adjust the height to maintain aspect ratio */
-        object-fit: contain; /* Ensure the image scales properly */
-    }
+        body, html {
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
 
-    #corner-icon {
-        position: absolute;
-        opacity: 0;
-        top: 0;
-        left: 0;
-        margin-top: 20px;
-        margin-left: 20px;
-    }
+        #interactive {
+            width: 100vw; /* Full width of the viewport */
+            height: 100vh; /* Full height of the viewport, adjust if necessary */
+        }
 
-    #wip-sign {
-        margin-left: 25%;
-        width: 50%; /* Set the image width to be 20% smaller than the screen */
-        max-height: auto; /* Make the image responsive */
+        #main-asset {
+            max-width: 90%; /* Give some margin around the image */
+            max-height: 80vh; /* Adjust the height to maintain aspect ratio */
+            object-fit: contain; /* Ensure the image scales properly */
+        }
+
+        #corner-icon {
+            position: absolute;
+            opacity: 0;
+            top: 0;
+            left: 0;
+            margin-top: 20px;
+            margin-left: 20px;
+        }
+
+        #wip-sign {
+            margin-left: 25%;
+            width: 50%; /* Set the image width to be 20% smaller than the screen */
+            max-height: auto; /* Make the image responsive */
+        }
     }
 
     audio {
-        display: none;
-    }
+    display: none;
 }
-
-
 
 #introductory-screen {
     position: fixed;
