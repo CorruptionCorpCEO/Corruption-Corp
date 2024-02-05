@@ -12,14 +12,13 @@ body {
     align-items: center;
     width: 100%; /* Fill the width of the viewport */
     height: 100%; /* Fill the height of the viewport */
-}
-
-
-#main-asset {
     max-width: 100%; /* Limit image width to prevent overflow */
     max-height: 80vh; /* Limit image height with some space */
     object-fit: contain; /* Maintain aspect ratio */
 }
+
+
+
 
 #corner-icon {
     top: 0;
