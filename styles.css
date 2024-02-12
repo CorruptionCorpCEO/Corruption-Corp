@@ -28,6 +28,13 @@ body {
     margin-left: 20px;
 }
 
+#back-icon {
+    top: 0;
+    left: 0;
+    margin-top: 20px;
+    margin-left: 20px;
+}
+
 #wip-sign {
     margin-left: 25%;
     width: 50%; /* Set the image width to be 20% smaller than the screen */
@@ -35,9 +42,10 @@ body {
 }
 
 
-    @media (max-width: 600px) { /* Adjust the max-width as needed for targeting mobile devices */
 
-      
+@media (max-width: 600px) { /* Adjust the max-width as needed for targeting mobile devices */
+
+   
 
         body, html {
             margin: 0;
@@ -59,12 +67,17 @@ body {
         }
 
         #corner-icon {
-            position: absolute;
-            opacity: 0;
+            display: none;
             top: 0;
             left: 0;
             margin-top: 20px;
             margin-left: 20px;
+        }
+
+        #back-icon {
+            position: fixed;
+            top: 20px;
+            left: 20px;
         }
 
         #wip-sign {
@@ -77,6 +90,8 @@ body {
     audio {
     display: none;
 }
+
+
 
 #introductory-screen {
     position: fixed;
@@ -109,5 +124,75 @@ body {
     100% {
         opacity: 0;
         display: none;
+    }
+}
+
+
+#mobile-menu {
+    display: none; /* Ensure this is toggled via JS */
+    position: fixed;
+    top: 10%;
+    left: 5%;
+    right: 5%; /* Ensure the menu does not extend beyond the viewport */
+    bottom: 10%; /* Ensure the menu does not extend beyond the viewport */
+    background-color: transparent;
+    display: flex;
+    flex-direction: column;
+    justify-content: center; /* Center children vertically */
+    align-items: center; /* Align items in the center, horizontally */
+    z-index: 1000;
+    padding: 10px;
+    box-sizing: border-box;
+}
+
+    #mobile-menu button {
+        width: 100%; /* Ensure buttons take full width of their container */
+        height: 30%;
+        margin: 3.33% 0; /* Space between buttons */
+        padding: 12px 0; /* Padding inside buttons */
+        font-size: 16px;
+        color: white;
+        background-color: black;
+        box-shadow: 0 0 0 2px white;
+        border: none;
+        border-radius: 5px;
+        text-align: center;
+    }
+
+.button {
+    display: inline-block;
+    padding: 50px; /* Add padding as needed */
+    background-size: contain; /* Ensure the entire image fits within the button */
+    background-repeat: no-repeat;
+    background-position: center;
+    border: none;
+    cursor: pointer;
+    text-align: center;
+    color: white;
+    font-size: 16px;
+    text-decoration: none;
+    /* Add more styles as needed */
+}
+
+/* Individual button styles */
+#button1 {
+    background-image: url('images/assets/main/grit button.png');
+    
+}
+
+#button2 {
+    background-image: url('images/assets/main/music button.png');
+    
+}
+
+#button3 {
+    background-image: url('images/assets/main/clothing button.png');
+    
+}
+
+
+@media screen and (min-width: 769px) {
+    #mobile-menu {
+        display: none !important; /* Force hide on larger screens */
     }
 }
