@@ -129,7 +129,7 @@ body {
 
 
 #mobile-menu {
-    display: none; /* Ensure this is toggled via JS */
+    display: none; !important; /* Ensure this is toggled via JS */
     position: fixed;
     top: 10%;
     left: 5%;
