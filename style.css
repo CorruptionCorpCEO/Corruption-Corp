@@ -16,6 +16,10 @@ body {
     position: relative;
 }
 
+.intrologo {
+    width: 5%;
+}
+
 #introductory-screen {
     position: fixed;
     width: 100%;
@@ -226,6 +230,7 @@ body {
     color: #f0f0f0;
     text-shadow: 0 2px 4px rgba(0,0,0,1);
     text-align: center;
+
 }
 
 .info-meta {
@@ -236,6 +241,8 @@ body {
     white-space: nowrap;
 }
 
+
+
 /* --- Mobile Adjustments --- */
 @media (max-width: 768px) {
     /* No change to category-layer bottom position is needed since it was removed */
@@ -244,7 +251,8 @@ body {
     .slot-left, .slot-right { flex: 1; } /* Make visible sides narrower */
     .slot-center { flex: 8; }
     
-    #info-desc { font-size: 1.1rem; }
+    #info-desc { font-size: 0.8rem;}
+    .intrologo {width: 30%;}
     .nav-btn { font-size: 2.5rem; padding: 10px; }
     
     .brand-header { top: 10px; }

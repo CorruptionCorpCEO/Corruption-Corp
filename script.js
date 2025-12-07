@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
         },
         {
             title: "sloe jin",
-            desc: "Rapper / Producer of distorted electronic-inspired hip-hop",
+            desc: "Distorted digital hip-hop",
             url: "https://sloejin.net",
             img: "images/sloejinslide.png",
             // NEW PROPERTY
