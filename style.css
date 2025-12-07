@@ -161,21 +161,18 @@ body {
 
 /* NEW: Style for the category image - positioned at the bottom of .slot-center */
 .category-img {
-    /* CHANGED: Absolute position within the .slot-center */
     position: absolute;
     bottom: 140px; /* Offset it slightly above the info bar */
     left: 50%;
     transform: translateX(-50%); /* Center horizontally */
-    
-    /* CHANGED: Set width to 80% relative to the .slot-center parent */
     width: auto; 
     max-width: none;
-    
     height: 120px;
     display: block;
     margin: 0; 
     filter: drop-shadow(0 5px 15px rgba(0,0,0,1));
     z-index: 15; /* Above the slot background, below the indicator */
+    transition: opacity 0.2s ease-in-out;
 }
 
 
@@ -230,6 +227,7 @@ body {
     color: #f0f0f0;
     text-shadow: 0 2px 4px rgba(0,0,0,1);
     text-align: center;
+    transition: opacity 0.2s ease-in-out;
 
 }
 

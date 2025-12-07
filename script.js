@@ -1,14 +1,12 @@
 document.addEventListener('DOMContentLoaded', () => {
     
     // --- Configuration ---
-    // Ensure you have these images or change to color gradients for testing
     const sites = [
         {
             title: "PHRYSK",
             desc: "Graphic rugs for Melbourne CBD",
             url: "https://phrysk.com",
             img: "images/phryskslide.png",
-            // NEW PROPERTY: Add the path to your title image/graphic
             titleImg: "images/phrysk_title.png" 
         },
         {
@@ -16,7 +14,6 @@ document.addEventListener('DOMContentLoaded', () => {
             desc: "Distorted digital hip-hop",
             url: "https://sloejin.net",
             img: "images/sloejinslide.png",
-            // NEW PROPERTY
             titleImg: "images/sloejin_title.png"
         },
         {
@@ -24,7 +21,6 @@ document.addEventListener('DOMContentLoaded', () => {
             desc: "A weird little magazine...",
             url: "./wip",
             img: "images/gritslide.png",
-            // NEW PROPERTY
             titleImg: "images/grit_title.png"
         },
         {
@@ -32,7 +28,6 @@ document.addEventListener('DOMContentLoaded', () => {
             desc: "Get in touch for any inquiry",
             url: "https://www.instagram.com/corruptioncorporation/",
             img: "images/contactslide.png",
-            // NEW PROPERTY
             titleImg: "images/contact_title.png"
         }
     ];
@@ -47,7 +42,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('slot-4')
     ];
     
-    // CHANGED: Get the image element instead of the h1
     const titleImgEl = document.getElementById('category-image'); 
     const descEl = document.getElementById('info-desc');
     const indexEl = document.getElementById('info-index');
@@ -63,23 +57,43 @@ document.addEventListener('DOMContentLoaded', () => {
         const total = sites.length;
         const activeSite = sites[currentIndex];
 
-        // Animate text changes
-        titleImgEl.style.opacity = 0; // Use image element
+        // 1. Initiate the Fade-Out for Image and Text
+        // CSS transitions handle the smooth drop to 0 opacity
+        titleImgEl.style.opacity = 0; 
         descEl.style.opacity = 0;
 
-        setTimeout(() => {
-            // CHANGED: Set the image source instead of text content
-            titleImgEl.src = activeSite.titleImg; 
-            titleImgEl.alt = activeSite.title; // Keep alt for accessibility
-            
-            descEl.textContent = activeSite.desc;
-            indexEl.textContent = `${currentIndex + 1}/${total}`;
-            
-            titleImgEl.style.opacity = 1;
-            descEl.style.opacity = 1;
-        }, 150);
+        // 2. Update Content Immediately (while invisible)
+        
+        // Update text content
+        descEl.textContent = activeSite.desc;
+        indexEl.textContent = `${currentIndex + 1}/${total}`;
+        
+        // Update image source
+        titleImgEl.src = activeSite.titleImg; 
+        titleImgEl.alt = activeSite.title; 
 
-        // Update Slots
+        // 3. Wait for the NEW image to load, then Fade In
+        
+        // Use a function to handle the fade-in logic
+        const fadeInContent = () => {
+            // Initiate the Fade-In for both text and image
+            // CSS transitions handle the smooth rise to 1 opacity
+            descEl.style.opacity = 1; 
+            titleImgEl.style.opacity = 1;
+            // Clear the onload listener after successful fade-in
+            titleImgEl.onload = null;
+        };
+
+        // If the image is loaded from cache (is complete), fade in instantly
+        if (titleImgEl.complete) {
+            fadeInContent();
+        } else {
+            // Otherwise, wait for the 'load' event
+            titleImgEl.onload = fadeInContent;
+        }
+
+
+        // Update Slots (Background Images)
         const offsets = [-2, -1, 0, 1, 2];
         
         slots.forEach((slot, i) => {
@@ -88,7 +102,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const siteData = sites[siteIndex];
 
             // Set Background
-            // For real images use: slot.style.backgroundImage = `url(${siteData.img})`;
             slot.style.backgroundImage = `url(${siteData.img})`;
             
             // Logic for the center slot
