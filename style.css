@@ -81,8 +81,18 @@ body {
     z-index: 1;
 }
 
-/* REMOVED: category-layer and category-title-text styles */
+#wip-sign {
+    margin-left: 25%;
+    width: 50%; /* Set the image width to be 20% smaller than the screen */
+    max-height: auto; /* Make the image responsive */
+}
 
+#back-icon {
+    top: 0;
+    left: 0;
+    margin-top: 20px;
+    margin-left: 20px;
+}
 
 /* The Carousel Track */
 .carousel-wrapper {
