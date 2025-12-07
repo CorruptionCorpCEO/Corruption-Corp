@@ -1,0 +1,242 @@
+/* --- Reset & Base --- */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    background-color: #000;
+    color: #fff;
+    font-family: 'Impact', Helvetica, Arial, sans-serif;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+    position: relative;
+}
+
+#introductory-screen {
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    background-color: #000;
+    color: #fff;
+    display: flex;
+    z-index: 100; /* Above carousel */
+    justify-content: center;
+    align-items: center;
+    animation: fadeOut 1s ease 2s forwards; /* 2s duration, 3s delay */
+}
+
+#main-content {
+    opacity: 1;
+}
+
+#black-background {
+    width: 100%; /* Adjust the width as needed */
+    height: 100%; /* Adjust the height as needed */
+    background-color: #000; /* Black color */
+}
+
+
+@keyframes fadeOut {
+    0% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0;
+        display: none;
+    }
+}
+
+/* --- 1. Header (Floating) --- */
+.brand-header {
+    position: fixed;
+    top: 50px;
+    left: 0;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 95; /* Above carousel */
+    pointer-events: none; /* Let clicks pass through to the image */
+}
+
+.logo-img {
+    /* Adjust width as needed for your PNG */
+    width: 150px; 
+    height: auto;
+    filter: drop-shadow(0 5px 10px rgba(0,0,0,0.8));
+}
+
+/* --- 2. Main Carousel (Full Screen Layer) --- */
+.main-stage {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+}
+
+/* REMOVED: category-layer and category-title-text styles */
+
+
+/* The Carousel Track */
+.carousel-wrapper {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+}
+
+.carousel-track {
+    display: flex;
+    width: 100%;
+    height: 100%; /* Full height */
+    gap: 0; /* No gap between full height panels looks better */
+}
+
+/* Slots Logic */
+.slot {
+    height: 100%;
+    background-size: cover;
+    background-position: center;
+    transition: all 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+    position: relative;
+    cursor: pointer;
+    border-right: 1px solid rgba(0,0,0,0.5); /* Subtle separator */
+}
+
+/* The Slivers */
+.slot-far-left, .slot-far-right {
+    flex: 2; 
+    filter: grayscale(100%) brightness(0.2);
+}
+
+.slot-left, .slot-right {
+    /* CHANGED: Increased flex to make these slots wider */
+    flex: 3; 
+    filter: grayscale(100%) brightness(0.4);
+}
+
+/* The Active Center */
+.slot-center {
+    /* CHANGED: Significantly reduced flex from 12 to 6 to make it thinner */
+    flex: 3; 
+    filter: none;
+    z-index: 10;
+    /* CHANGED: Added relative position for absolute children (image/indicator) */
+    position: relative;
+    display: block;
+    text-decoration: none;
+    box-shadow: 0 0 50px rgba(0,0,0,0.8); /* Shadow over side slots */
+}
+
+/* The indicator is now absolutely positioned inside slot-center */
+.click-indicator {
+    position: absolute; 
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 20;
+    opacity: 0; 
+}
+
+/* NEW: Style for the category image - positioned at the bottom of .slot-center */
+.category-img {
+    /* CHANGED: Absolute position within the .slot-center */
+    position: absolute;
+    bottom: 140px; /* Offset it slightly above the info bar */
+    left: 50%;
+    transform: translateX(-50%); /* Center horizontally */
+    
+    /* CHANGED: Set width to 80% relative to the .slot-center parent */
+    width: auto; 
+    max-width: none;
+    
+    height: 120px;
+    display: block;
+    margin: 0; 
+    filter: drop-shadow(0 5px 15px rgba(0,0,0,1));
+    z-index: 15; /* Above the slot background, below the indicator */
+}
+
+
+/* Navigation Buttons (Floating) */
+.nav-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    color: white;
+    font-size: 4rem;
+    cursor: pointer;
+    padding: 20px;
+    z-index: 95;
+    text-shadow: 0 0 20px rgba(0,0,0,1);
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+.nav-btn:hover { opacity: 1; }
+.prev-btn { left: 10px; }
+.next-btn { right: 10px; }
+
+/* --- 3. Footer Info Bar (Floating) --- */
+.info-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    padding: 40px 30px 30px 30px; /* Extra top padding for gradient */
+    /* Gradient allows text to be readable on any image */
+    background: Black;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    z-index: 95;
+}
+
+.info-content {
+    flex: 1;
+    margin-right: 20px;
+}
+
+#info-desc {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 1.5rem; /* Much larger */
+    font-weight: 500;
+    line-height: 1.2;
+    color: #f0f0f0;
+    text-shadow: 0 2px 4px rgba(0,0,0,1);
+    text-align: center;
+}
+
+.info-meta {
+    font-family: monospace;
+    color: #888;
+    font-size: 1.2rem;
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+/* --- Mobile Adjustments --- */
+@media (max-width: 768px) {
+    /* No change to category-layer bottom position is needed since it was removed */
+
+    .slot-far-left, .slot-far-right { display: none; } /* Hide far edges */
+    .slot-left, .slot-right { flex: 1; } /* Make visible sides narrower */
+    .slot-center { flex: 8; }
+    
+    #info-desc { font-size: 1.1rem; }
+    .nav-btn { font-size: 2.5rem; padding: 10px; }
+    
+    .brand-header { top: 10px; }
+    .logo-img { width: 150px; }
+}
