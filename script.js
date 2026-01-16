@@ -4,14 +4,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const sites = [
         {
             title: "PHRYSK",
-            desc: "Graphic rugs for Melbourne CBD",
+            desc: "Graphic spot rugs Australia-wide",
             url: "https://phrysk.com",
             img: "images/phryskslide.png",
             titleImg: "images/phrysk_title.png" 
         },
         {
             title: "sloe jin",
-            desc: "Distorted digital hip-hop",
+            desc: "Distorted digital rap",
             url: "https://sloejin.net",
             img: "images/sloejinslide.png",
             titleImg: "images/sloejin_title.png"
@@ -154,4 +154,5 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Init
     updateDisplay();
+
 });
