@@ -17,26 +17,26 @@
       } catch (e) {}
     </script>
     <script>
-      // App-program deep links (/pinballa) jump straight to the standalone app
-      // instead of booting the whole React/3D site just to redirect (App.jsx's
-      // parseRoute still handles it as a fallback). Keep the route + target in
-      // sync with data/programs/Pinballa/page.txt (`route` / `app` fields).
-      // /pinballa/<name> opens a specific published machine (?machine=<name>).
-      // Machine Shop machines are private to their account and deliberately
-      // have no route.
+      // /pinballa/<name> opens a specific published machine. The bare /pinballa
+      // no longer needs anything here: the build writes the Pinballa app's own
+      // html at /pinballa/index.html, so that URL loads the app directly and
+      // STAYS /pinballa (it used to bounce to /pinball/index.html). Only the
+      // per-machine form still lands on the site shell — via 404.html, since
+      // published machines are Firestore data and can't be enumerated at build
+      // time — so it's rewritten onto the same clean path.
+      // Machine Shop machines are private to their account and have no route.
       try {
         var segs = decodeURIComponent(location.pathname)
           .replace(/^\/+|\/+$/g, '')
           .toLowerCase()
           .split('/')
-        if (segs[0] === 'pinballa') {
-          if (segs[1]) location.replace('/pinball/index.html?machine=' + encodeURIComponent(segs[1]))
-          else location.replace('/pinball/index.html')
+        if (segs[0] === 'pinballa' && segs[1]) {
+          location.replace('/pinballa/?machine=' + encodeURIComponent(segs[1]))
         }
       } catch (e) {}
     </script>
-    <script type="module" crossorigin src="/assets/index-BqD8YGn2.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-DvyfqmzG.css">
+    <script type="module" crossorigin src="/assets/index-C7tvw8zt.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-CQBPFwII.css">
   </head>
   <body>
     <div id="root"></div>

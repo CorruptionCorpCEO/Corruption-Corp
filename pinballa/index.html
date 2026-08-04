@@ -1,44 +1,688 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
-    />
-    <link rel="icon" href="/favicon.png">
-    <title>Corruption Corp</title>
-    <script>
-      // Paint the background dark BEFORE React mounts when dark mode is saved,
-      // so a refresh in dark mode never flashes the light background first.
-      try {
-        if (localStorage.getItem('cc-dark') === '1')
-          document.documentElement.classList.add('cc-dark')
-      } catch (e) {}
-    </script>
-    <script>
-      // App-program deep links (/pinballa) jump straight to the standalone app
-      // instead of booting the whole React/3D site just to redirect (App.jsx's
-      // parseRoute still handles it as a fallback). Keep the route + target in
-      // sync with data/programs/Pinballa/page.txt (`route` / `app` fields).
-      // /pinballa/<name> opens a specific published machine (?machine=<name>).
-      // Machine Shop machines are private to their account and deliberately
-      // have no route.
-      try {
-        var segs = decodeURIComponent(location.pathname)
-          .replace(/^\/+|\/+$/g, '')
-          .toLowerCase()
-          .split('/')
-        if (segs[0] === 'pinballa') {
-          if (segs[1]) location.replace('/pinball/index.html?machine=' + encodeURIComponent(segs[1]))
-          else location.replace('/pinball/index.html')
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pinballa</title>
+    <!-- Root-absolute so it survives both dev (served at /) and the
+         build:site --base=/pinball/ rebase, which prefixes root paths in
+         this file automatically (see /ui/*.png references above). -->
+    <link rel="icon" type="image/png" href="/pinball/favicon.png">
+    <style>
+        /* Boot splash — the Pinballa take on the Corruption Corp site's splash
+           (logo + spinner, 0.7s fade), on the app's black chrome. Inline so it
+           paints the instant the HTML arrives, while the bundle + Firebase
+           load; script.js fades it out once physics is ready. */
+        #pinballa-splash {
+            position: fixed;
+            inset: 0;
+            z-index: 5000;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: clamp(28px, 5vh, 56px);
+            transition: opacity 0.7s ease;
         }
-      } catch (e) {}
+        #pinballa-splash.splash-hide {
+            opacity: 0;
+            pointer-events: none;
+        }
+        #pinballa-splash img {
+            width: min(60vw, 420px);
+            max-height: 40vh;
+            object-fit: contain;
+        }
+        .pinballa-splash-loader {
+            width: clamp(34px, 6vh, 52px);
+            height: clamp(34px, 6vh, 52px);
+            border-radius: 50%;
+            border: 4px solid rgba(255, 255, 255, 0.12);
+            border-top-color: rgba(255, 255, 255, 0.65);
+            animation: pinballaSplashSpin 0.8s linear infinite;
+        }
+        @keyframes pinballaSplashSpin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+  <script type="module" crossorigin src="/pinball/assets/index-VVp3X4pE.js"></script>
+  <link rel="stylesheet" crossorigin href="/pinball/assets/index-U7R2OaTs.css">
+</head>
+<body>
+    <div id="pinballa-splash" role="status" aria-label="Loading">
+        <img src="/pinball/ui/pinballa-logo.png" alt="Pinballa">
+        <div class="pinballa-splash-loader"></div>
+    </div>
+    <script>
+        // Safety net (mirrors the site splash): never hold the splash if the
+        // app fails to signal readiness.
+        setTimeout(function () {
+            var s = document.getElementById('pinballa-splash');
+            if (s) s.classList.add('splash-hide');
+        }, 8000);
     </script>
-    <script type="module" crossorigin src="/assets/index-BqD8YGn2.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-DvyfqmzG.css">
-  </head>
-  <body>
-    <div id="root"></div>
-  </body>
+    <!-- Profile Modal (Popup) -->
+    <div id="profile-modal" class="modal-backdrop">
+        <div id="profile-container" class="panel profile-panel">
+            <button id="btn-close-profile" class="btn-close" aria-label="Close">&times;</button>
+            <!-- The panel itself must never clip (the close chip straddles its
+                 corner), so the phone-height scroll lives on this wrapper. -->
+            <div class="panel-scroll">
+            <h3 class="panel-heading">Profile</h3>
+            <!-- Accounts live on the Corruption Corp site (one shared account).
+                 Login/registration and profile editing both open the site's
+                 account panel (/account) in a new tab — same origin + Firebase
+                 project, so signing in there signs this tab in live. -->
+            <!-- Cohesive layout: one identity CARD up top (avatar + name +
+                 logout, stats strip under a hairline), then uniform
+                 panel-sections — Description, account actions, and the
+                 collapsibles — each separated by the same hairline rule. -->
+            <div id="auth-unlogged">
+                <div id="auth-prompt" class="auth-prompt"></div>
+                <div class="profile-card">
+                    <button id="btn-open-cc-login" class="btn btn-primary account-btn">Log in / Register</button>
+                    <p class="profile-managed-note">Opens the CORRUPTION CORP account panel in a new tab — signing in there signs you in here too.</p>
+                </div>
+            </div>
+            <div id="auth-logged">
+                <!-- User info (green): avatar, name, square Edit Profile, stats.
+                     Collapsible like the other sections. -->
+                <div class="panel-section profile-opt accent-green">
+                    <button type="button" id="btn-dd-userinfo" class="dd-plain-header" data-tilt aria-expanded="false" aria-controls="user-info-body">
+                        User info <span class="dd-plain-arrow">&#9662;</span>
+                    </button>
+                    <div id="user-info-body" class="dd-plain-body">
+                    <div class="profile-row">
+                        <img id="profile-picture" src="" alt="User"/>
+                        <div class="profile-row-meta">
+                            <div id="profile-username"></div>
+                        </div>
+                        <button id="btn-edit-profile" class="btn btn-secondary btn-icon" aria-label="Edit profile" title="Edit profile"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4H6a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M17.5 3.5l3 3-6.7 6.7-3.4.4.4-3.4 6.7-6.7z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></button>
+                    </div>
+                    <!-- Account stats: joined date comes from the auth user's
+                         metadata; the top-10 count is fetched when the modal
+                         opens (script.js: refreshTop10Stat). -->
+                    <div id="profile-stats">
+                        <div class="profile-stat"><span class="profile-stat-label">Joined</span><span class="profile-stat-value" id="stat-joined">&mdash;</span></div>
+                        <div class="profile-stat"><span class="profile-stat-label">Top 10s</span><span class="profile-stat-value" id="stat-top10">&mdash;</span></div>
+                    </div>
+                    <!-- Name colour: 7 palette swatches, applied to the profile
+                         name + leaderboard rows. Built in script.js. -->
+                    <div class="name-color-block">
+                        <span class="field-label">Name colour</span>
+                        <div id="name-swatches" class="name-swatches"></div>
+                    </div>
+                    </div><!-- /#user-info-body -->
+                </div>
+
+                <!-- Machines this player has upvoted in the arcade (script.js:
+                     renderMyUpvoted, filled when the modal opens). -->
+                <div class="panel-section profile-opt accent-pink">
+                    <button type="button" id="btn-dd-upvoted" class="dd-plain-header" data-tilt aria-expanded="false" aria-controls="my-upvoted-body">
+                        Your upvoted machines <span class="dd-plain-arrow">&#9662;</span>
+                    </button>
+                    <div id="my-upvoted-body" class="dd-plain-body">
+                        <div id="my-upvoted-grid" class="pp-grid"></div>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- Site Settings collapses (the always-open background controls
+                 made the modal too tall). -->
+            <div class="panel-section profile-opt accent-yellow">
+                <button type="button" id="btn-dd-site" class="dd-plain-header" data-tilt aria-expanded="false" aria-controls="site-settings-body">
+                    Site Settings <span class="dd-plain-arrow">&#9662;</span>
+                </button>
+                <div id="site-settings-body" class="dd-plain-body">
+                <div class="ss-cat">Audio</div>
+                <div class="ss-row">
+                    <span class="slider-label">Music volume: <span id="music-vol-val">50</span>%</span>
+                    <input type="range" id="music-volume" min="0" max="100" value="50">
+                </div>
+                <div class="ss-row">
+                    <span class="slider-label">SFX volume: <span id="sfx-vol-val">50</span>%</span>
+                    <input type="range" id="sfx-volume" min="0" max="100" value="50">
+                </div>
+
+                <div class="ss-cat">Site background</div>
+                <div class="ss-row ss-row-inline">
+                    <label class="btn btn-secondary btn-icon file-btn" aria-label="Upload background image" title="Upload image">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M8 8l4-4 4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                        <input type="file" id="site-bg-upload" accept="image/*" hidden />
+                    </label>
+                    <select id="site-bg-style" class="field">
+                        <option value="cover">Fill (Cover)</option>
+                        <option value="contain">Fit (Contain)</option>
+                        <option value="repeat">Tiling (Repeat)</option>
+                        <option value="stretch">Stretch (100% 100%)</option>
+                    </select>
+                </div>
+                <div class="ss-row" id="site-bg-size-container">
+                    <span class="slider-label">Tile size: <span id="site-bg-size-val">100</span>px</span>
+                    <input type="range" id="site-bg-size" min="50" max="2000" value="100">
+                </div>
+                <div class="ss-row" id="site-bg-opacity-container">
+                    <span class="slider-label">Opacity: <span id="site-bg-opacity-val">35</span>%</span>
+                    <input type="range" id="site-bg-opacity" min="0" max="100" value="35">
+                </div>
+                <div class="ss-row">
+                    <button id="btn-clear-bg" class="btn btn-danger">Clear Background</button>
+                </div>
+
+                <div class="ss-cat">Other</div>
+                <div class="ss-row ss-row-inline">
+                    <button id="btn-open-guide-profile" class="btn btn-secondary btn-icon" aria-label="Open guide" title="Guide"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v15H7a2 2 0 0 0-2 2V4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M5 19a2 2 0 0 1 2-2h12" fill="none" stroke="currentColor" stroke-width="2"/></svg></button>
+                    <button id="btn-logout" class="btn btn-danger btn-small">Logout</button>
+                </div>
+                </div><!-- /#site-settings-body -->
+            </div>
+            </div><!-- /.panel-scroll -->
+        </div>
+    </div>
+
+    <!-- Welcome / tutorial (first visit) — shown once the boot splash clears
+         unless the visitor ticked "don't display again" (script.js,
+         localStorage: pinballa_welcome_seen). GUIDE swaps the box for the
+         full how-to; BACK returns to the box. -->
+    <div id="welcome-modal" class="modal-backdrop">
+        <div class="panel welcome-panel">
+            <button id="btn-close-welcome" class="btn-close" aria-label="Close">&times;</button>
+
+            <div id="welcome-home">
+                <img class="welcome-logo" src="/pinball/ui/pinballa-logo.png" alt="Pinballa" draggable="false">
+                <h3 class="panel-heading">Welcome to Pinballa</h3>
+                <p class="welcome-blurb">This is a pinball construction kit. Draw walls, drop in
+                   bumpers, grabbers and bosses, reskin every part — then play your machine
+                   and publish it to the Arcade for everyone else.</p>
+                <p class="welcome-blurb">First time? The guide covers the tools, the menus and
+                   how to play.</p>
+                <button id="btn-open-guide" class="btn btn-primary">GUIDE</button>
+                <button id="btn-welcome-exit" class="btn btn-secondary">EXIT</button>
+                <label class="welcome-dontshow">
+                    <input type="checkbox" id="welcome-dont-show"> Don't display again
+                </label>
+            </div>
+
+            <div id="welcome-guide">
+                <h3 class="panel-heading">How it works</h3>
+                <div class="guide-scroll">
+                    <h4 class="panel-subheading">The editor</h4>
+                    <p class="guide-note">The board is always live — the ball, flippers and plunger
+                       work while you build, so test as you go. Tools and components sit in the
+                       left panel; the Arcade, cosmetics, saving and your profile sit in the
+                       right one. Scroll the board to zoom (pinch on phones); on phones the
+                       logo opens the tools and the &#9776; opens the menus.</p>
+
+                    <h4 class="panel-subheading">Tools</h4>
+                    <div class="guide-row"><span class="guide-ico"><img src="/pinball/tools/select.png" alt=""></span>
+                        <p><strong>Select</strong> <kbd>S</kbd> — click a piece to grab it, or drag empty space
+                           to box-select. Drag to move; the top handle rotates, the corner handle
+                           resizes. Drag with the middle mouse button to pan the board.</p></div>
+                    <div class="guide-row"><span class="guide-ico"><img src="/pinball/tools/merge.png" alt=""></span>
+                        <p><strong>Merge</strong> — with several pieces selected, fuses the ones that touch
+                           into one shape. Only matching pieces combine — a wall never merges with
+                           a bumper.</p></div>
+                    <div class="guide-row"><span class="guide-ico"><img src="/pinball/tools/wall.png" alt=""></span>
+                        <p><strong>Wall</strong> <kbd>W</kbd> — click to place points and click the first point
+                           again to close the shape, or right-click-drag to draw freehand.</p></div>
+                    <div class="guide-row"><span class="guide-ico"><img src="/pinball/tools/onion.png" alt=""></span>
+                        <p><strong>Onion</strong> <kbd>G</kbd> — leaves a ghost trail behind the rolling ball.
+                           Toggle off to clear it.</p></div>
+                    <div class="guide-row"><span class="guide-ico"><img src="/pinball/tools/mirror.png" alt=""></span>
+                        <p><strong>Mirror</strong> <kbd>M</kbd> — copies the selection, flipped across the
+                           board's centre.</p></div>
+                    <div class="guide-row"><span class="guide-ico"><img src="/pinball/tools/grid.png" alt=""></span>
+                        <p><strong>Grid</strong> — lays snapping guides over the board. Dragged pieces lock
+                           their edges and centres to the lines.</p></div>
+                    <div class="guide-row"><span class="guide-ico"><img src="/pinball/tools/undo.png" alt=""></span>
+                        <p><strong>Undo / Redo</strong> — <kbd>Ctrl</kbd>+<kbd>Z</kbd> and <kbd>Ctrl</kbd>+<kbd>Y</kbd>.</p></div>
+
+                    <h4 class="panel-subheading">Components</h4>
+                    <p class="guide-note">Drawn exactly like walls — same click, freehand and circle
+                       gestures. Each has a colour and a job:</p>
+                    <div class="guide-row"><span class="guide-ico ico-bumper"><img src="/pinball/tools/bumper.png" alt=""></span>
+                        <p><strong>Bumper</strong> <kbd>1</kbd> — solid; kicks the ball away hard.
+                           <strong>+3,000</strong> per hit.</p></div>
+                    <div class="guide-row"><span class="guide-ico ico-grabber"><img src="/pinball/tools/grabber.png" alt=""></span>
+                        <p><strong>Grabber</strong> <kbd>2</kbd> — catches the ball, holds it a beat, then drops
+                           it from the shape's lowest point. <strong>+10,000</strong> per catch.</p></div>
+                    <div class="guide-row"><span class="guide-ico ico-point"><img src="/pinball/tools/point.png" alt=""></span>
+                        <p><strong>Point</strong> <kbd>3</kbd> — the ball rolls straight through it.
+                           <strong>+1,000</strong> per pass.</p></div>
+                    <div class="guide-row"><span class="guide-ico ico-boss"><img src="/pinball/tools/boss.png" alt=""></span>
+                        <p><strong>Boss</strong> <kbd>4</kbd> — the ball rolls through it, lighting it up.
+                           Light every boss on the board for the JACKPOT: <strong>+1,000,000</strong>.</p></div>
+
+                    <h4 class="panel-subheading">The menus</h4>
+                    <div class="guide-row"><p><strong>ARCADE</strong> — everyone's published machines.
+                       Pick one, hit PLAY, chase its leaderboard. Browsing and playing are free.</p></div>
+                    <div class="guide-row"><p><strong>MACHINE SHOP</strong> — your own saved machines on
+                       this device, plus "Create New Machine" (account required).</p></div>
+                    <div class="guide-row"><p><strong>COSMETICS</strong> — reskin the overlay, plunger,
+                       flippers or ball: download a part's template, draw on it, upload it back.
+                       The eye toggles hide your Drawn components or the Default wall so only your overlay art shows.
+                       Below that, swap any sound effect — or the music — for your own audio.
+                       Custom skins and sounds need an account.</p></div>
+                    <div class="guide-row"><p><strong>SAVE</strong> — name it, describe it, then Save
+                       (<kbd>Ctrl</kbd>+<kbd>S</kbd>, to your Machine Shop) or Publish (<kbd>Ctrl</kbd>+<kbd>P</kbd>, to the public
+                       Arcade). Both need an account.</p></div>
+                    <div class="guide-row"><p><strong>PROFILE</strong> — pinned at the bottom: log in or
+                       register, edit your name and avatar, or set a custom background for the app.
+                       Your profile rides along with your published machines and high scores.</p></div>
+
+                    <h4 class="panel-subheading">How to play</h4>
+                    <div class="guide-row"><p><strong>Launch</strong> — hold <kbd>Space</kbd> or <kbd>&darr;</kbd> to pull
+                       the plunger, release to fire. On phones, hold the LAUNCH button under
+                       the board.</p></div>
+                    <div class="guide-row"><p><strong>Flippers</strong> — <kbd>&larr;</kbd> / <kbd>&rarr;</kbd> (or <kbd>Z</kbd>
+                       and <kbd>/</kbd>). On phones, hold the <strong>&#9664;</strong> / <strong>&#9654;</strong> buttons under the board.</p></div>
+                    <div class="guide-row"><p><strong>Modes</strong> — the editor gives you endless test
+                       balls. For a real 3-ball game use CLASSIC (full-table view) or FANTASIES
+                       (the camera rides with the ball) — exit either with the &times;. Lose all three
+                       balls and the high scores come up; on a published machine your best score
+                       posts to its leaderboard automatically while you're signed in.</p></div>
+                </div>
+                <button id="btn-guide-back" class="btn btn-secondary">BACK</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="app-container">
+        <div id="left-column">
+            <img id="logo-rectangle" src="/pinball/ui/pinballa-logo.png" alt="Pinballa" draggable="false">
+
+            <div id="editor-panel">
+            <!-- Tool / component buttons are 3D shiny white "chips" (see the
+                 .chip rules in style.css + initChips() in script.js): the disc
+                 tilts toward the cursor, the art extrudes off its front face,
+                 and a click flips it 360deg. Structure per chip:
+                   button.chip > .chip-tilt > .chip-flip > (.chip-face + img.chip-art)
+                 The button keeps its id + click handler; the chip is purely
+                 visual and additive. -->
+            <div class="editor-section">
+                <h3>Tools</h3>
+                <div class="editor-grid">
+                    <button id="btn-select" class="chip" data-chip aria-label="Select"><span class="chip-tilt"><span class="chip-flip"><span class="chip-face"></span><img class="chip-art" src="/pinball/tools/select.png" alt="Select"></span></span></button>
+                    <button id="btn-merge" class="chip" data-chip aria-label="Merge"><span class="chip-tilt"><span class="chip-flip"><span class="chip-face"></span><img class="chip-art" src="/pinball/tools/merge.png" alt="Merge"></span></span></button>
+                    <button id="btn-pen" class="chip" data-chip aria-label="Wall"><span class="chip-tilt"><span class="chip-flip"><span class="chip-face"></span><img class="chip-art" src="/pinball/tools/wall.png" alt="Wall"></span></span></button>
+                    <button id="btn-onion" class="chip" data-chip aria-label="Onion"><span class="chip-tilt"><span class="chip-flip"><span class="chip-face"></span><img class="chip-art" src="/pinball/tools/onion.png" alt="Onion"></span></span></button>
+                    <button id="btn-mirror" class="chip" data-chip aria-label="Mirror"><span class="chip-tilt"><span class="chip-flip"><span class="chip-face"></span><img class="chip-art" src="/pinball/tools/mirror.png" alt="Mirror"></span></span></button>
+                    <button id="btn-grid" class="chip" data-chip aria-label="Grid"><span class="chip-tilt"><span class="chip-flip"><span class="chip-face"></span><img class="chip-art" src="/pinball/tools/grid.png" alt="Grid"></span></span></button>
+                    <button id="btn-undo" class="chip" data-chip aria-label="Undo"><span class="chip-tilt"><span class="chip-flip"><span class="chip-face"></span><img class="chip-art" src="/pinball/tools/undo.png" alt="Undo"></span></span></button>
+                    <button id="btn-redo" class="chip" data-chip aria-label="Redo"><span class="chip-tilt"><span class="chip-flip"><span class="chip-face"></span><img class="chip-art" src="/pinball/tools/redo.png" alt="Redo"></span></span></button>
+                </div>
+            </div>
+            <div class="editor-section">
+                <h3>Components</h3>
+                <div class="editor-grid">
+                    <button id="btn-bumper" class="chip" data-chip aria-label="Bumper"><span class="chip-tilt"><span class="chip-flip"><span class="chip-face"></span><img class="chip-art" src="/pinball/tools/bumper.png" alt="Bumper"></span></span></button>
+                    <button id="btn-grabber" class="chip" data-chip aria-label="Grabber"><span class="chip-tilt"><span class="chip-flip"><span class="chip-face"></span><img class="chip-art" src="/pinball/tools/grabber.png" alt="Grabber"></span></span></button>
+                    <button id="btn-point" class="chip" data-chip aria-label="Point"><span class="chip-tilt"><span class="chip-flip"><span class="chip-face"></span><img class="chip-art" src="/pinball/tools/point.png" alt="Point"></span></span></button>
+                    <button id="btn-boss" class="chip" data-chip aria-label="Boss"><span class="chip-tilt"><span class="chip-flip"><span class="chip-face"></span><img class="chip-art" src="/pinball/tools/boss.png" alt="Boss"></span></span></button>
+                </div>
+            </div>
+            <div class="editor-section">
+                <h3>Gamemodes</h3>
+                <button id="btn-classic" class="banner-btn banner-full" data-tilt><img src="/pinball/ui/classic_icon.png" alt="Classic"></button>
+                <button id="btn-fantasies" class="banner-btn banner-full" data-tilt><img src="/pinball/ui/fantasies_icon.png" alt="Fantasies"></button>
+            </div>
+
+            </div>
+
+        </div>
+
+        <button id="btn-exit-fantasies" class="mode-exit-btn" aria-label="Exit Fantasies">&times;</button>
+        <button id="btn-exit-classic" class="mode-exit-btn" aria-label="Exit Classic">&times;</button>
+        <!-- TV filters (classic/fantasies): CRT + mosaic strengths, and the
+             classic-only board-angle tilt. Wired in script.js (tvSettings).
+             The X/TV buttons pin to the scoreboard's top corners (JS:
+             positionModeButtons) — no data-tilt so their rotate isn't hijacked. -->
+        <button id="btn-tv" class="mode-exit-btn" aria-label="TV filters">TV</button>
+        <div id="tv-panel">
+            <div class="tv-row"><span class="slider-label">CRT: <span id="tv-crt-val">0</span>%</span><input type="range" id="tv-crt" min="0" max="100" value="0"></div>
+            <div class="tv-row"><span class="slider-label">Mosaic: <span id="tv-mosaic-val">0</span>%</span><input type="range" id="tv-mosaic" min="0" max="20" value="0"></div>
+            <div class="tv-row" id="tv-angle-row"><span class="slider-label">Board angle: <span id="tv-angle-val">0</span>&deg;</span><input type="range" id="tv-angle" min="0" max="40" value="0"></div>
+        </div>
+        <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+            <filter id="tv-mosaic-filter" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+                <feFlood x="1" y="1" width="1" height="1"/>
+                <feComposite width="3" height="3"/>
+                <feTile result="tiles"/>
+                <feComposite in="SourceGraphic" in2="tiles" operator="in"/>
+                <feMorphology operator="dilate" radius="1"/>
+            </filter>
+        </svg>
+        <div id="game-area">
+            <div id="game-wrapper">
+                <!-- Mobile-only bar above the scoreboard: the logo opens the
+                     left (tools) drawer, the hamburger opens the right
+                     (settings) one. Hidden on desktop and in play modes. -->
+                <div id="mobile-topbar">
+                    <button type="button" id="mobile-logo-btn" aria-label="Open tools menu">
+                        <img src="/pinball/ui/pinballa-logo.png" alt="Pinballa" draggable="false">
+                    </button>
+                    <button type="button" id="mobile-menu-btn" aria-label="Open settings menu">
+                        <span></span><span></span><span></span>
+                    </button>
+                </div>
+                <div id="score-container">
+                    <div id="score-display"></div>
+                </div>
+                <div id="game-container">
+                    <!-- Screen-space effects target: the mosaic filter applies
+                         to THIS layer, so its blocks read straight-on however
+                         the board inside is 3D-tilted (filtering #game-inner
+                         itself would perspective-warp the pixels). -->
+                    <div id="tv-filter-layer">
+                    <div id="game-inner">
+                        <!-- Images should be placed in the public/ directory -->
+                        <img src="/pinball/board/board.png" id="board" alt="Pinball Board" draggable="false">
+                        <canvas id="walls-canvas"></canvas>
+                        <canvas id="glow-canvas" style="position:absolute; top:0; left:0; width:100%; height:100%; z-index: 14; pointer-events:none;"></canvas>
+                        <canvas id="onion-canvas" style="position:absolute; top:0; left:0; width:100%; height:100%; z-index: 13; pointer-events:none;"></canvas>
+                        <canvas id="editor-canvas"></canvas>
+                        <img src="/pinball/board/flipper_left.png" id="flipper-left" class="flipper" alt="Left Flipper" draggable="false">
+                        <img src="/pinball/board/flipper_right.png" id="flipper-right" class="flipper" alt="Right Flipper" draggable="false">
+                        <img src="/pinball/board/plunger.png" id="plunger" alt="Plunger" draggable="false">
+                        <div id="ball"></div>
+                        <img id="overlay-skin" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; z-index:10; pointer-events:none; object-fit: fill;" draggable="false">
+                    </div>
+                    </div><!-- /#tv-filter-layer -->
+                    <!-- CRT scanline/vignette layer (TV panel); opacity is the
+                         strength, shown only in play modes (CSS gate). -->
+                    <div id="crt-overlay" aria-hidden="true"></div>
+
+                    <button id="btn-fantasies-start" class="btn btn-primary" style="display: none;" data-tilt>PLAY</button>
+                    <!-- Leaderboard Overlay — site chrome (black panel, white
+                         hairlines, offset shadow), like the rest of the app. -->
+                    <div id="leaderboard-overlay" style="display:none;">
+                        <h2>HIGH SCORES</h2>
+                        <div id="leaderboard-list"></div>
+                        <!-- Scores are profile-linked: posted automatically
+                             under the signed-in account (no initials), or an
+                             invite to log in. -->
+                        <div id="score-entry" style="display:none;">
+                            <p>YOUR SCORE: <span id="final-score-display"></span></p>
+                            <p id="score-entry-note"></p>
+                            <button id="btn-score-login" class="btn btn-primary" style="display:none;">Log in / Register</button>
+                        </div>
+                        <button id="btn-reset-game" class="btn btn-primary">PLAY AGAIN</button>
+                    </div>
+                </div>
+                <!-- Mobile-only physical controls under the board: hold ◀ / ▶
+                     for the flippers, hold LAUNCH to charge the plunger and
+                     release to fire. They drive the same keys the keyboard
+                     uses, so playing never has to touch the board itself
+                     (board touches belong to the editor's tools). -->
+                <div id="mobile-controls">
+                    <button type="button" id="mc-flip-left" aria-label="Left flipper">&#9664;</button>
+                    <button type="button" id="mc-plunger" aria-label="Plunger">LAUNCH</button>
+                    <button type="button" id="mc-flip-right" aria-label="Right flipper">&#9654;</button>
+                </div>
+            </div>
+        </div>
+        <div id="right-column">
+            <div id="settings-panel">
+                <!-- Arcade, Shop, Cosmetics & Save scroll together inside this
+                     black container; the profile footer below is PINNED (it sits
+                     outside .settings-scroll so it stays put while this scrolls). -->
+                <div class="settings-scroll">
+                <button id="btn-open-arcade-public" class="banner-btn" data-tilt>
+                    <img src="/pinball/ui/arcade_icon.png" alt="Arcade">
+                </button>
+                <button id="btn-arcade" class="banner-btn" data-tilt>
+                    <img src="/pinball/ui/machine_shop_icon.png" alt="Machine Shop">
+                </button>
+
+                <!-- Cosmetics & Save are collapsible dropdowns; their headers are
+                     banner buttons styled like the Arcade / Machine Shop ones. -->
+                <div class="menu-dropdown" id="dd-cosmetics">
+                    <button type="button" class="banner-btn dd-header" id="btn-dd-cosmetics" data-tilt
+                            aria-expanded="false" aria-controls="skins-container">
+                        <img src="/pinball/ui/cosmetics_icon.png" alt="Cosmetics">
+                    </button>
+                    <div class="dd-body">
+                <div id="skins-container" class="panel-inset">
+                    <div class="skin-toggle-block">
+                        <div class="skin-toggle-row">
+                            <button type="button" id="btn-eye-drawn" class="btn-eye" aria-label="Toggle drawn components" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3.2" fill="currentColor"/></svg></button>
+                            <span>Drawn components</span>
+                        </div>
+                        <p class="section-hint">Your drawn walls &amp; parts. Hide to show only your overlay art.</p>
+                        <div class="skin-toggle-row">
+                            <button type="button" id="btn-eye-wall" class="btn-eye" aria-label="Toggle default wall" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3.2" fill="currentColor"/></svg></button>
+                            <span>Default wall</span>
+                        </div>
+                        <p class="section-hint">The board's built-in wall art.</p>
+                        <!-- Hidden state-holders: the eye buttons above drive these
+                             (checked = that layer hidden), reused by save/load. -->
+                        <input type="checkbox" id="toggle-drawn-components" hidden>
+                        <input type="checkbox" id="toggle-main-wall" hidden>
+                    </div>
+
+                    <button type="button" id="btn-dd-skins" class="cosmetics-sub" data-tilt aria-expanded="true" aria-controls="skins-body">
+                        Skins <span class="cosmetics-sub-arrow">&#9662;</span>
+                    </button>
+                    <div id="skins-body" class="cosmetics-sub-body open">
+                    <p class="section-hint">Reskin any part — download its template, draw on it, upload it back.</p>
+                    <div class="skin-list custom-scroll">
+                        <div class="skin-option">
+                            <span>Overlay</span>
+                            <div class="skin-buttons">
+                                <button type="button" id="btn-eye-overlay" class="btn-eye" aria-label="Toggle overlay skin" aria-pressed="true" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3.2" fill="currentColor"/></svg></button>
+                                <button id="btn-dl-overlay">Template</button>
+                                <button id="btn-up-overlay">Upload</button>
+                                <button id="btn-del-overlay" class="btn-delete-skin">Delete</button>
+                                <input type="file" id="file-overlay" accept="image/png, image/jpeg" hidden>
+                            </div>
+                        </div>
+                        <div class="skin-option">
+                            <span>Plunger</span>
+                            <div class="skin-buttons">
+                                <button type="button" id="btn-eye-plunger" class="btn-eye" aria-label="Toggle plunger skin" aria-pressed="true" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3.2" fill="currentColor"/></svg></button>
+                                <button id="btn-dl-plunger">Template</button>
+                                <button id="btn-up-plunger">Upload</button>
+                                <button id="btn-del-plunger" class="btn-delete-skin">Delete</button>
+                                <input type="file" id="file-plunger" accept="image/png, image/jpeg" hidden>
+                            </div>
+                        </div>
+                        <div class="skin-option">
+                            <span>Left Flipper</span>
+                            <div class="skin-buttons">
+                                <button type="button" id="btn-eye-flipper-l" class="btn-eye" aria-label="Toggle left flipper skin" aria-pressed="true" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3.2" fill="currentColor"/></svg></button>
+                                <button id="btn-dl-flipper-l">Template</button>
+                                <button id="btn-up-flipper-l">Upload</button>
+                                <button id="btn-del-flipper-l" class="btn-delete-skin">Delete</button>
+                                <input type="file" id="file-flipper-l" accept="image/png, image/jpeg" hidden>
+                            </div>
+                        </div>
+                        <div class="skin-option">
+                            <span>Right Flipper</span>
+                            <div class="skin-buttons">
+                                <button type="button" id="btn-eye-flipper-r" class="btn-eye" aria-label="Toggle right flipper skin" aria-pressed="true" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3.2" fill="currentColor"/></svg></button>
+                                <button id="btn-dl-flipper-r">Template</button>
+                                <button id="btn-up-flipper-r">Upload</button>
+                                <button id="btn-del-flipper-r" class="btn-delete-skin">Delete</button>
+                                <input type="file" id="file-flipper-r" accept="image/png, image/jpeg" hidden>
+                            </div>
+                        </div>
+                        <div class="skin-option">
+                            <span>Ball</span>
+                            <div class="skin-buttons">
+                                <button type="button" id="btn-eye-ball" class="btn-eye" aria-label="Toggle ball skin" aria-pressed="true" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3.2" fill="currentColor"/></svg></button>
+                                <button id="btn-dl-ball">Template</button>
+                                <button id="btn-up-ball">Upload</button>
+                                <button id="btn-del-ball" class="btn-delete-skin">Delete</button>
+                                <input type="file" id="file-ball" accept="image/*" hidden>
+                            </div>
+                        </div>
+                    </div>
+                    </div><!-- /#skins-body -->
+
+                    <button type="button" id="btn-dd-sounds" class="cosmetics-sub" data-tilt aria-expanded="false" aria-controls="sounds-body">
+                        Sounds <span class="cosmetics-sub-arrow">&#9662;</span>
+                    </button>
+                    <div id="sounds-body" class="cosmetics-sub-body">
+                    <p class="section-hint">Replace any sound effect — or the music — with your own audio.</p>
+                    <div id="sounds-list-container">
+                        <!-- Generated dynamically by script.js -->
+                    </div>
+                    </div><!-- /#sounds-body -->
+                </div>
+                    </div>
+                </div>
+
+                <div class="menu-dropdown" id="dd-save">
+                    <button type="button" class="banner-btn dd-header" id="btn-dd-save" data-tilt
+                            aria-expanded="false" aria-controls="save-container">
+                        <img src="/pinball/ui/save-buttons.png" alt="Save">
+                    </button>
+                    <div class="dd-body">
+                        <div id="save-container" class="panel-inset">
+                            <label class="field-label" for="machine-name">Machine name</label>
+                            <input type="text" id="machine-name" class="field" placeholder="My Machine">
+                            <label class="field-label" for="machine-desc">Description</label>
+                            <textarea id="machine-desc" class="field" placeholder="What's this table about?"></textarea>
+                            <button id="btn-save-machine" class="btn btn-primary">Save</button>
+                            <p class="section-hint">Saves to your Machine Shop on this device.</p>
+                            <button id="btn-publish-machine" class="btn btn-secondary">Publish</button>
+                            <p class="section-hint">Puts it in the public Arcade for everyone to play.</p>
+                            <!-- Publish size feedback (script.js): "compressed to fit"
+                                 or a "too large" message. Hidden until it has text. -->
+                            <p id="publish-note" class="section-hint publish-note" style="display:none;"></p>
+                        </div>
+                    </div>
+                </div>
+
+                </div><!-- /.settings-scroll -->
+
+                <!-- Profile — PINNED footer: stays put while the panel scrolls.
+                     Shows a signed-in card or a login prompt (auth state, JS). -->
+                <div id="panel-profile">
+                    <button type="button" id="panel-profile-card" title="View your profile" data-tilt>
+                        <img id="panel-profile-pic" alt="">
+                        <span class="panel-profile-meta">
+                            <span id="panel-profile-name">No Name</span>
+                            <span class="panel-profile-sub">View profile</span>
+                        </span>
+                    </button>
+                    <button type="button" id="panel-profile-login" data-tilt>
+                        <span class="panel-profile-login-title">Not signed in</span>
+                        <span class="panel-profile-login-sub">Log in or register to save, publish &amp; add custom skins</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="arcade-modal">
+        <div class="arcade-modal-content">
+            <div class="arcade-modal-header">
+                <h2 id="arcade-modal-title">Pinball Machines</h2>
+                <div class="btn-row">
+                    <button id="btn-close-arcade" class="btn-close btn-close-inline" aria-label="Close">&times;</button>
+                </div>
+            </div>
+            <!-- Sort filter — only shown for the PUBLIC arcade (script.js).
+                 New = newest, Popular = most-played (leaderboard entries),
+                 Most Liked = highest net upvotes. -->
+            <div id="arcade-filter" class="arcade-filter" style="display:none;">
+                <button type="button" class="arcade-filter-btn active" data-sort="new">New</button>
+                <button type="button" class="arcade-filter-btn" data-sort="popular">Popular</button>
+                <button type="button" class="arcade-filter-btn" data-sort="liked">Most Liked</button>
+            </div>
+            <div id="arcade-list"></div>
+            <!-- Floating action, pinned to the window's bottom-right corner
+                 (see .arcade-modal-content). #arcade-list reserves room under
+                 the grid so the last row never sits behind it. -->
+            <button id="btn-new-machine" class="btn btn-primary">
+                <span class="nm-line-1">Create</span>
+                <span class="nm-line-2">New Machine</span>
+            </button>
+        </div>
+    </div>
+
+    <div id="arcade-detail-modal">
+        <!-- Close chip lives OUT here, on the modal itself: .arcade-detail-content
+             is `overflow: hidden` and would slice the corner-straddling X. -->
+        <button id="btn-close-detail" class="btn-close" aria-label="Close">&times;</button>
+        <div class="arcade-detail-content">
+            <!-- Mode Selection Overlay -->
+            <div id="mode-selection-overlay">
+                <div class="mode-select-row">
+                    <button id="btn-mode-classic" class="banner-btn banner-full"><img src="/pinball/ui/classic_icon.png" alt="Classic"></button>
+                    <button id="btn-mode-fantasies" class="banner-btn banner-full"><img src="/pinball/ui/fantasies_icon.png" alt="Fantasies"></button>
+                </div>
+                <button id="btn-mode-back" class="btn btn-secondary mode-back-btn">BACK</button>
+            </div>
+
+            <div class="arcade-detail-left">
+                <img id="detail-preview" src="">
+            </div>
+            <div class="arcade-detail-right">
+                <div class="detail-title-row">
+                    <h2 id="detail-title">Machine Title</h2>
+                </div>
+                <div class="detail-author-row">
+                    <img id="detail-author-img" src="">
+                    <span id="detail-author-name">Anonymous</span>
+                </div>
+                <div id="detail-published-status">Published</div>
+                <!-- Up/down votes — shown only for public arcade machines
+                     (script.js). Clicking a button casts / toggles the signed-in
+                     player's vote; the score is the net (up − down). -->
+                <div id="detail-votes" class="detail-votes" style="display:none;">
+                    <button id="btn-upvote" class="vote-btn" type="button" aria-label="Upvote">&#9650;</button>
+                    <span id="vote-score" class="vote-score">0</span>
+                    <button id="btn-downvote" class="vote-btn" type="button" aria-label="Downvote">&#9660;</button>
+                </div>
+                <div class="detail-scroll">
+                    <p id="detail-desc">Description goes here...</p>
+                    <!-- Top 10 leaderboard for public machines (script.js:
+                         loadDetailLeaderboard). The entry count is the machine's
+                         play count. -->
+                    <div id="detail-leaderboard" class="detail-leaderboard" style="display:none;">
+                        <div class="detail-lb-head">
+                            <h3 class="detail-lb-title">High Scores</h3>
+                            <span id="detail-lb-count" class="detail-lb-count"></span>
+                        </div>
+                        <div id="detail-lb-list" class="detail-lb-list"></div>
+                    </div>
+                </div>
+                <div class="arcade-detail-actions">
+                    <button id="btn-detail-play" class="btn btn-primary">PLAY</button>
+                    <button id="btn-detail-delete" class="btn btn-danger">DELETE</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Public player profile — opened by clicking a machine author in the
+         arcade detail view (script.js: openPublicProfile). Shows the player's
+         published machines and the machines they've upvoted. -->
+    <div id="public-profile-modal" class="modal-backdrop">
+        <div class="panel public-profile-panel">
+            <button id="btn-close-public-profile" class="btn-close" aria-label="Close">&times;</button>
+            <!-- Scroll on the wrapper, not the panel — the panel must not clip
+                 the corner-straddling close chip. -->
+            <div class="panel-scroll">
+            <div class="pp-head">
+                <img id="pp-avatar" class="pp-avatar" alt="">
+                <h3 id="pp-name" class="panel-heading pp-name">Player</h3>
+            </div>
+            <div class="pp-section">
+                <h4 class="panel-subheading">Published machines</h4>
+                <div id="pp-published" class="pp-grid"></div>
+            </div>
+            <div class="pp-section">
+                <h4 class="panel-subheading">Upvoted machines</h4>
+                <div id="pp-upvoted" class="pp-grid"></div>
+            </div>
+            </div><!-- /.panel-scroll -->
+        </div>
+    </div>
+
+</body>
 </html>
