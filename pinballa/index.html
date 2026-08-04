@@ -3,7 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pinballa</title>
+    <title>Pinballa — build and play your own pinball machines</title>
+    <!-- This app is served at BOTH /pinball/index.html (build output) and
+         /pinballa/ (its public route — the build copies this file there; see
+         the route plugin in the site's vite.config.js). The canonical points at
+         /pinballa so search engines index one URL, and robots.txt disallows
+         /pinball/ so the duplicate never competes with it. -->
+    <meta
+      name="description"
+      content="Pinballa is a free browser pinball construction kit: draw walls, drop in bumpers and flippers, then play your table and publish it to the arcade."
+    />
+    <link rel="canonical" href="https://corruptioncorp.net/pinballa/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Corruption Corp" />
+    <meta property="og:title" content="Pinballa — build and play your own pinball machines" />
+    <meta
+      property="og:description"
+      content="A free browser pinball construction kit: draw walls, drop in bumpers and flippers, then play your table and publish it to the arcade."
+    />
+    <meta property="og:url" content="https://corruptioncorp.net/pinballa/" />
+    <meta property="og:image" content="https://corruptioncorp.net/pinball/ui/pinballa-logo.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Pinballa — build and play your own pinball machines" />
+    <meta
+      name="twitter:description"
+      content="A free browser pinball construction kit: draw walls, drop in bumpers and flippers, then play your table and publish it to the arcade."
+    />
+    <meta name="twitter:image" content="https://corruptioncorp.net/pinball/ui/pinballa-logo.png" />
+    <meta name="theme-color" content="#000000" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "VideoGame",
+        "name": "Pinballa",
+        "url": "https://corruptioncorp.net/pinballa/",
+        "applicationCategory": "GameApplication",
+        "operatingSystem": "Any (web browser)",
+        "description": "A free browser pinball construction kit: build a table, play it, and publish it to the arcade.",
+        "publisher": { "@type": "Organization", "name": "Corruption Corp", "url": "https://corruptioncorp.net/" },
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+      }
+    </script>
     <!-- Root-absolute so it survives both dev (served at /) and the
          build:site --base=/pinball/ rebase, which prefixes root paths in
          this file automatically (see /ui/*.png references above). -->
@@ -46,8 +86,8 @@
             to { transform: rotate(360deg); }
         }
     </style>
-  <script type="module" crossorigin src="/pinball/assets/index-VVp3X4pE.js"></script>
-  <link rel="stylesheet" crossorigin href="/pinball/assets/index-U7R2OaTs.css">
+  <script type="module" crossorigin src="/pinball/assets/index-DWgAYYoQ.js"></script>
+  <link rel="stylesheet" crossorigin href="/pinball/assets/index-Dsd7MT1v.css">
 </head>
 <body>
     <div id="pinballa-splash" role="status" aria-label="Loading">
