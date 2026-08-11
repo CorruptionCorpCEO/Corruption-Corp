@@ -2,7 +2,11 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- The app owns zoom itself (pinch and double-tap-hold drive the editor's
+         own zoomLevel — see script.js), so the BROWSER's pinch-zoom and
+         double-tap-to-zoom must stay out of it: left on, they fight the
+         gesture and leave the page scaled with the board half off-screen. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <!-- Page name is deliberately just "Pinballa" (matches the site's own
          "Corruption Corp"). The longer pitch lives in the description/OG tags
          below, where search results and link previews use it. -->
@@ -89,8 +93,8 @@
             to { transform: rotate(360deg); }
         }
     </style>
-  <script type="module" crossorigin src="/pinball/assets/index-PMOTzhZO.js"></script>
-  <link rel="stylesheet" crossorigin href="/pinball/assets/index-B2N9Cl9C.css">
+  <script type="module" crossorigin src="/pinball/assets/index-D8ELt_-g.js"></script>
+  <link rel="stylesheet" crossorigin href="/pinball/assets/index-jLkpUd_Y.css">
 </head>
 <body>
     <div id="pinballa-splash" role="status" aria-label="Loading">
