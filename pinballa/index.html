@@ -93,8 +93,8 @@
             to { transform: rotate(360deg); }
         }
     </style>
-  <script type="module" crossorigin src="/pinball/assets/index-D8ELt_-g.js"></script>
-  <link rel="stylesheet" crossorigin href="/pinball/assets/index-jLkpUd_Y.css">
+  <script type="module" crossorigin src="/pinball/assets/index-B8F6qdzm.js"></script>
+  <link rel="stylesheet" crossorigin href="/pinball/assets/index-BKhoJK7M.css">
 </head>
 <body>
     <div id="pinballa-splash" role="status" aria-label="Loading">
@@ -433,7 +433,14 @@
                         <img src="/pinball/board/flipper_left.png" id="flipper-left" class="flipper" alt="Left Flipper" draggable="false">
                         <img src="/pinball/board/flipper_right.png" id="flipper-right" class="flipper" alt="Right Flipper" draggable="false">
                         <img src="/pinball/board/plunger.png" id="plunger" alt="Plunger" draggable="false">
-                        <div id="ball"></div>
+                        <!-- #ball-pos is a full-size transparent layer that
+                             carries the ball's POSITION as a transform; #ball
+                             itself keeps its size, skin and the .held lift.
+                             Splitting them is what lets the position be a pure
+                             compositor transform (see renderGame) while the
+                             lift keeps its own eased transform + transition —
+                             one element could not do both. -->
+                        <div id="ball-pos"><div id="ball"></div></div>
                         <img id="overlay-skin" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; z-index:10; pointer-events:none; object-fit: fill;" draggable="false">
                     </div>
                     </div><!-- /#tv-filter-layer -->
