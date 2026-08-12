@@ -55,6 +55,26 @@
          build:site --base=/pinball/ rebase, which prefixes root paths in
          this file automatically (see /ui/*.png references above). -->
     <link rel="icon" type="image/png" href="/pinball/favicon.png">
+    <!-- Pinballa installs as its own app (its own manifest, its own icon,
+         locked to portrait). Installed there is no browser chrome to retract,
+         so the viewport is genuinely constant — the board never re-derives its
+         size mid-play. The manifest and icons are served from the SITE's root
+         (same origin), which is also where the service worker that makes it
+         installable lives. -->
+    <link rel="manifest" href="/pinballa.webmanifest">
+    <link rel="apple-touch-icon" href="/icons/pinballa-any-180.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="Pinballa">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#000000">
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('/sw.js').catch(function () {})
+        })
+      }
+    </script>
     <style>
         /* Boot splash — the Pinballa take on the Corruption Corp site's splash
            (logo + spinner, 0.7s fade), on the app's black chrome. Inline so it

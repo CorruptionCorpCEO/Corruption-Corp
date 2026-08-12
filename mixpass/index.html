@@ -11,6 +11,17 @@
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
     <link rel="icon" href="/favicon.png">
+    <!-- Installable app. Installed, there IS no browser chrome to retract, so
+         the viewport is constant by construction — which is the only complete
+         answer to the URL bar resizing the page (see `.app` in styles.css for
+         what the in-browser case does instead). Deliberately OUTSIDE the seo
+         markers: the route plugin rewrites everything between those per route,
+         and these are the same for every one. -->
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="apple-touch-icon" href="/icons/cc-any-180.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Corruption Corp">
+    <meta name="mobile-web-app-capable" content="yes">
     <!-- seo:start -->
     <title>MixPass — Corruption Corp</title>
     <meta name="description" content="StreetPass for music taste. MixPass is a cross-platform iOS and Android app with a late-2000s Frutiger Aero / Nintendo Wii Menu aesthetic that connects local…" />
@@ -20,11 +31,11 @@
     <meta property="og:title" content="MixPass — Corruption Corp" />
     <meta property="og:description" content="StreetPass for music taste. MixPass is a cross-platform iOS and Android app with a late-2000s Frutiger Aero / Nintendo Wii Menu aesthetic that connects local…" />
     <meta property="og:url" content="https://corruptioncorp.net/mixpass/" />
-    <meta property="og:image" content="https://corruptioncorp.net/assets/mixpass-cover-DtzAUgmq.png" />
+    <meta property="og:image" content="https://corruptioncorp.net/assets/logo-BcBw4Vsn.png" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="MixPass — Corruption Corp" />
     <meta name="twitter:description" content="StreetPass for music taste. MixPass is a cross-platform iOS and Android app with a late-2000s Frutiger Aero / Nintendo Wii Menu aesthetic that connects local…" />
-    <meta name="twitter:image" content="https://corruptioncorp.net/assets/mixpass-cover-DtzAUgmq.png" />
+    <meta name="twitter:image" content="https://corruptioncorp.net/assets/logo-BcBw4Vsn.png" />
     <meta name="theme-color" content="#e8e8e8" />
     <!-- seo:end -->
     <script type="application/ld+json">
@@ -39,6 +50,18 @@
           "https://x.com/corruptioncorpp",
           "https://youtube.com/@corruptioncorporation"
         ]
+      }
+    </script>
+    <script>
+      // Register the service worker. It exists only to make the app
+      // INSTALLABLE (Chrome requires one that answers offline) — see
+      // data/site/sw.js, which is deliberately network-first so a deploy is
+      // never hidden behind a stale cache. Failure is not worth reporting: it
+      // costs the install prompt, nothing else.
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('/sw.js').catch(function () {})
+        })
       }
     </script>
     <script>
