@@ -113,8 +113,8 @@
             to { transform: rotate(360deg); }
         }
     </style>
-  <script type="module" crossorigin src="/pinball/assets/index-B9FK4nW3.js"></script>
-  <link rel="stylesheet" crossorigin href="/pinball/assets/index-B58lvzV0.css">
+  <script type="module" crossorigin src="/pinball/assets/index-DStqmn1s.js"></script>
+  <link rel="stylesheet" crossorigin href="/pinball/assets/index-C6RfAr-d.css">
 </head>
 <body>
     <div id="pinballa-splash" role="status" aria-label="Loading">
@@ -357,6 +357,22 @@
     </div>
 
     <div id="app-container">
+        <!-- Mobile only, and always on screen: the two game modes as long bars
+             across the top, above both the tool rail and the board (which the
+             layout shrinks to make room — see --modebar-h / --rail-w in
+             style.css). These are PROXIES: the real buttons keep their ids,
+             their chip/tilt wiring and every handler in #gamemodes-section, and
+             these just forward the click. Relocating the originals between the
+             two layouts would mean moving live nodes on every resize; a
+             forwarded click cannot fall out of sync with them. -->
+        <div id="mobile-modebar">
+            <button type="button" class="modebar-btn" data-proxy="btn-classic" aria-label="Classic">
+                <img src="/pinball/ui/classic_icon.png" alt="Classic" draggable="false">
+            </button>
+            <button type="button" class="modebar-btn" data-proxy="btn-fantasies" aria-label="Fantasies">
+                <img src="/pinball/ui/fantasies_icon.png" alt="Fantasies" draggable="false">
+            </button>
+        </div>
         <div id="left-column">
             <img id="logo-rectangle" src="/pinball/ui/pinballa-logo.png" alt="Pinballa" draggable="false">
 
@@ -390,7 +406,9 @@
                     <button id="btn-boss" class="chip" data-chip aria-label="Boss"><span class="chip-tilt"><span class="chip-flip"><span class="chip-face"></span><img class="chip-art" src="/pinball/tools/boss.png" alt="Boss"></span></span></button>
                 </div>
             </div>
-            <div class="editor-section">
+            <!-- Mobile hides this whole section: the two modes are promoted to
+                 the persistent #mobile-modebar across the top of the screen. -->
+            <div class="editor-section" id="gamemodes-section">
                 <h3>Gamemodes</h3>
                 <button id="btn-classic" class="banner-btn banner-full" data-tilt><img src="/pinball/ui/classic_icon.png" alt="Classic"></button>
                 <button id="btn-fantasies" class="banner-btn banner-full" data-tilt><img src="/pinball/ui/fantasies_icon.png" alt="Fantasies"></button>
@@ -423,11 +441,11 @@
         </svg>
         <div id="game-area">
             <div id="game-wrapper">
-                <!-- Mobile-only bar above the scoreboard: the logo opens the
-                     left (tools) drawer, the hamburger opens the right
-                     (settings) one. Hidden on desktop and in play modes. -->
+                <!-- Mobile-only bar above the scoreboard: the logo shows/hides
+                     the docked tool rail, the hamburger opens the right
+                     (settings) drawer. Hidden on desktop and in play modes. -->
                 <div id="mobile-topbar">
-                    <button type="button" id="mobile-logo-btn" aria-label="Open tools menu">
+                    <button type="button" id="mobile-logo-btn" aria-label="Show or hide the tools">
                         <img src="/pinball/ui/pinballa-logo.png" alt="Pinballa" draggable="false">
                     </button>
                     <button type="button" id="mobile-menu-btn" aria-label="Open settings menu">
