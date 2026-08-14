@@ -113,8 +113,8 @@
             to { transform: rotate(360deg); }
         }
     </style>
-  <script type="module" crossorigin src="/pinball/assets/index-DStqmn1s.js"></script>
-  <link rel="stylesheet" crossorigin href="/pinball/assets/index-C6RfAr-d.css">
+  <script type="module" crossorigin src="/pinball/assets/index-C4ausCWT.js"></script>
+  <link rel="stylesheet" crossorigin href="/pinball/assets/index-K55xDpEK.css">
 </head>
 <body>
     <div id="pinballa-splash" role="status" aria-label="Loading">
@@ -357,22 +357,6 @@
     </div>
 
     <div id="app-container">
-        <!-- Mobile only, and always on screen: the two game modes as long bars
-             across the top, above both the tool rail and the board (which the
-             layout shrinks to make room — see --modebar-h / --rail-w in
-             style.css). These are PROXIES: the real buttons keep their ids,
-             their chip/tilt wiring and every handler in #gamemodes-section, and
-             these just forward the click. Relocating the originals between the
-             two layouts would mean moving live nodes on every resize; a
-             forwarded click cannot fall out of sync with them. -->
-        <div id="mobile-modebar">
-            <button type="button" class="modebar-btn" data-proxy="btn-classic" aria-label="Classic">
-                <img src="/pinball/ui/classic_icon.png" alt="Classic" draggable="false">
-            </button>
-            <button type="button" class="modebar-btn" data-proxy="btn-fantasies" aria-label="Fantasies">
-                <img src="/pinball/ui/fantasies_icon.png" alt="Fantasies" draggable="false">
-            </button>
-        </div>
         <div id="left-column">
             <img id="logo-rectangle" src="/pinball/ui/pinballa-logo.png" alt="Pinballa" draggable="false">
 
@@ -454,6 +438,25 @@
                 </div>
                 <div id="score-container">
                     <div id="score-display"></div>
+                </div>
+                <!-- Mobile only: the two game modes as long full-width bars
+                     between the scoreboard and the board, shown and hidden by
+                     the same logo press that shows the tool rail beside the
+                     board (body.rail-open).
+
+                     These are PROXIES: the real buttons keep their ids, their
+                     chip/tilt wiring and every handler in #gamemodes-section,
+                     and these just forward the click. Relocating the originals
+                     between the two layouts would mean moving live nodes on
+                     every resize; a forwarded click cannot fall out of sync
+                     with them. -->
+                <div id="mobile-modebar">
+                    <button type="button" class="modebar-btn" data-proxy="btn-classic" aria-label="Classic">
+                        <img src="/pinball/ui/classic_icon.png" alt="Classic" draggable="false">
+                    </button>
+                    <button type="button" class="modebar-btn" data-proxy="btn-fantasies" aria-label="Fantasies">
+                        <img src="/pinball/ui/fantasies_icon.png" alt="Fantasies" draggable="false">
+                    </button>
                 </div>
                 <div id="game-container">
                     <!-- Screen-space effects target: the mosaic filter applies
