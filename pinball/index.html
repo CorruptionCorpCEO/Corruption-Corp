@@ -113,8 +113,8 @@
             to { transform: rotate(360deg); }
         }
     </style>
-  <script type="module" crossorigin src="/pinball/assets/index-D6Oth-OA.js"></script>
-  <link rel="stylesheet" crossorigin href="/pinball/assets/index-BtHfbp6z.css">
+  <script type="module" crossorigin src="/pinball/assets/index-tVpHpMOh.js"></script>
+  <link rel="stylesheet" crossorigin href="/pinball/assets/index-D-EJRjk6.css">
 </head>
 <body>
     <div id="pinballa-splash" role="status" aria-label="Loading">
@@ -286,7 +286,9 @@
                     <div class="guide-row"><span class="guide-ico"><img src="/pinball/tools/select.png" alt=""></span>
                         <p><strong>Select</strong> <kbd>S</kbd> — click a piece to grab it, or drag empty space
                            to box-select. Drag to move; the top handle rotates, the corner handle
-                           resizes. Drag with the middle mouse button to pan the board.</p></div>
+                           resizes. The numbered squares beside the selection set its layer; the red
+                           &times; on the other side deletes it (<kbd>Del</kbd> or <kbd>X</kbd>).
+                           Drag with the middle mouse button to pan the board.</p></div>
                     <div class="guide-row"><span class="guide-ico"><img src="/pinball/tools/merge.png" alt=""></span>
                         <p><strong>Merge</strong> — with several pieces selected, fuses the ones that touch
                            into one shape. Only matching pieces combine — a wall never merges with
@@ -304,7 +306,9 @@
                         <p><strong>Grid</strong> — lays snapping guides over the board. Dragged pieces lock
                            their edges and centres to the lines.</p></div>
                     <div class="guide-row"><span class="guide-ico"><img src="/pinball/tools/undo.png" alt=""></span>
-                        <p><strong>Undo / Redo</strong> — <kbd>Ctrl</kbd>+<kbd>Z</kbd> and <kbd>Ctrl</kbd>+<kbd>Y</kbd>.</p></div>
+                        <p><strong>Undo / Redo</strong> — <kbd>Ctrl</kbd>+<kbd>Z</kbd> and <kbd>Ctrl</kbd>+<kbd>Y</kbd>.
+                           Part-way through a shape, undo takes back the last point you placed
+                           instead of the last edit.</p></div>
 
                     <h4 class="panel-subheading">Components</h4>
                     <p class="guide-note">Drawn exactly like walls — same click, freehand and circle
