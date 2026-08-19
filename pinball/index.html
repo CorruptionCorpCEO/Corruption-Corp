@@ -112,9 +112,9 @@
         @keyframes pinballaSplashSpin {
             to { transform: rotate(360deg); }
         }
-    </style>
-  <script type="module" crossorigin src="/pinball/assets/index-tVpHpMOh.js"></script>
-  <link rel="stylesheet" crossorigin href="/pinball/assets/index-D-EJRjk6.css">
+    </style>
+  <script type="module" crossorigin src="/pinball/assets/index-BvBAPeY1.js"></script>
+  <link rel="stylesheet" crossorigin href="/pinball/assets/index-BBiotviu.css">
 </head>
 <body>
     <div id="pinballa-splash" role="status" aria-label="Loading">
@@ -658,7 +658,13 @@
                 </div><!-- /.settings-scroll -->
 
                 <!-- Profile — PINNED footer: stays put while the panel scrolls.
-                     Shows a signed-in card or a login prompt (auth state, JS). -->
+                     Shows a signed-in card or a login prompt (auth state, JS),
+                     sharing the row half-and-half with the way back to the
+                     Corruption Corp site. That link is NOT optional chrome:
+                     Pinballa opens in the same tab now (the Programs menu
+                     navigates rather than window.open-ing), so this is the only
+                     way home — which is why it sits outside the auth switch and
+                     shows in both states. -->
                 <div id="panel-profile">
                     <button type="button" id="panel-profile-card" title="View your profile" data-tilt>
                         <img id="panel-profile-pic" alt="">
@@ -671,6 +677,9 @@
                         <span class="panel-profile-login-title">Not signed in</span>
                         <span class="panel-profile-login-sub">Log in or register to save, publish &amp; add custom skins</span>
                     </button>
+                    <a id="panel-profile-home" href="/" title="Back to Corruption Corp" aria-label="Back to Corruption Corp" data-tilt>
+                        <img src="/pinball/ui/cclogo.png" alt="Corruption Corp" draggable="false">
+                    </a>
                 </div>
             </div>
         </div>
@@ -782,6 +791,6 @@
             </div><!-- /.panel-scroll -->
         </div>
     </div>
-
+
 </body>
 </html>
