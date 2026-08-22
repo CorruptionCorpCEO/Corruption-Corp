@@ -112,9 +112,9 @@
         @keyframes pinballaSplashSpin {
             to { transform: rotate(360deg); }
         }
-    </style>
-  <script type="module" crossorigin src="/pinball/assets/index-DYky8F5V.js"></script>
-  <link rel="stylesheet" crossorigin href="/pinball/assets/index-Cty7G237.css">
+    </style>
+  <script type="module" crossorigin src="/pinball/assets/index-B7dyocQG.js"></script>
+  <link rel="stylesheet" crossorigin href="/pinball/assets/index-CyiO8AhZ.css">
 </head>
 <body>
     <div id="pinballa-splash" role="status" aria-label="Loading">
@@ -275,6 +275,12 @@
             <div id="welcome-guide">
                 <h3 class="panel-heading">How it works</h3>
                 <div class="guide-scroll">
+                  <!-- MOUSE + KEYBOARD version. The touch one below covers the
+                       same ground for the phone layout — a rail instead of side
+                       panels, gestures instead of shortcuts. CSS shows exactly
+                       one of the two (see .guide-body in style.css); edit them
+                       together, they describe the same app. -->
+                  <div class="guide-body guide-body--desktop">
                     <h4 class="panel-subheading">The editor</h4>
                     <p class="guide-note">The board is always live — the ball, flippers and plunger
                        work while you build, so test as you go. Tools and components sit in the
@@ -354,6 +360,115 @@
                        (the camera rides with the ball) — exit either with the &times;. Lose all three
                        balls and the high scores come up; on a published machine your best score
                        posts to its leaderboard automatically while you're signed in.</p></div>
+                  </div><!-- /.guide-body--desktop -->
+
+                  <div class="guide-body guide-body--touch">
+                    <h4 class="panel-subheading">The editor</h4>
+                    <p class="guide-note">The board is always live — the ball, flippers and plunger
+                       work while you build, so test as you go. Tap the <strong>Pinballa logo</strong>
+                       (top left) to slide out the tool rail beside the board and the CLASSIC /
+                       FANTASIES bar above it; tap it again and the board takes that width back.
+                       Tap <strong>&#9776;</strong> (top right) for the Arcade, cosmetics, saving
+                       and your profile.</p>
+
+                    <h4 class="panel-subheading">Moving around the board</h4>
+                    <div class="guide-row"><p><strong>Two fingers</strong> — pinch to zoom, drag to
+                       pan. This works whatever tool is armed, and a two-finger gesture never draws:
+                       the board hands it to navigation and puts back anything the tool had
+                       started.</p></div>
+                    <div class="guide-row"><p><strong>Double-tap and hold</strong>, then drag —
+                       zooms with one finger. Up zooms in, down zooms out.</p></div>
+                    <div class="guide-row"><p><strong>The ball</strong> — drag it anywhere to
+                       reposition it, with any tool armed. Its grab area is wider on touch, so you
+                       don't have to land on it exactly.</p></div>
+
+                    <h4 class="panel-subheading">Tools</h4>
+                    <div class="guide-row"><span class="guide-ico"><img src="/pinball/tools/select.png" alt=""></span>
+                        <p><strong>Select</strong> — arm this first: with no tool on, a touch on the
+                           board is left free for pinch and pan, so tapping a piece does nothing
+                           until Select is lit. Then tap a piece to grab it, or drag empty board to
+                           box-select several. Drag to move; the top handle rotates, the corner
+                           handle resizes. The numbered squares beside the selection set its layer;
+                           the red &times; on the other side deletes it.
+                           <strong>Press and hold</strong> a piece you have picked up for half a
+                           second to duplicate it — the phone buzzes as the copy lands on top.</p></div>
+                    <div class="guide-row"><span class="guide-ico"><img src="/pinball/tools/merge.png" alt=""></span>
+                        <p><strong>Merge</strong> — with several pieces selected, fuses the ones that touch
+                           into one shape. Only matching pieces combine — a wall never merges with
+                           a bumper.</p></div>
+                    <div class="guide-row"><span class="guide-ico"><img src="/pinball/tools/wall.png" alt=""></span>
+                        <p><strong>Wall</strong> — <strong>tap</strong> to drop a point, then tap the
+                           first point again to close the shape. Or <strong>drag</strong> and draw
+                           the outline freehand — a touch that moves is a stroke, a touch that stays
+                           put is a point.</p></div>
+                    <div class="guide-row"><span class="guide-ico"><img src="/pinball/tools/onion.png" alt=""></span>
+                        <p><strong>Onion</strong> — leaves a ghost trail behind the rolling ball.
+                           Tap again to clear it.</p></div>
+                    <div class="guide-row"><span class="guide-ico"><img src="/pinball/tools/mirror.png" alt=""></span>
+                        <p><strong>Mirror</strong> — copies the selection, flipped across the
+                           board's centre.</p></div>
+                    <div class="guide-row"><span class="guide-ico"><img src="/pinball/tools/grid.png" alt=""></span>
+                        <p><strong>Grid</strong> — lays snapping guides over the board. Dragged pieces lock
+                           their edges and centres to the lines.</p></div>
+                    <div class="guide-row"><span class="guide-ico"><img src="/pinball/tools/undo.png" alt=""></span>
+                        <p><strong>Undo / Redo</strong> — the last two chips on the rail. Part-way
+                           through a shape, undo takes back the last point you placed instead of the
+                           last edit.</p></div>
+
+                    <h4 class="panel-subheading">Components</h4>
+                    <p class="guide-note">Drawn exactly like walls — tap out the points, or drag to
+                       draw freehand. Each has a colour and a job:</p>
+                    <div class="guide-row"><span class="guide-ico ico-bumper"><img src="/pinball/tools/bumper.png" alt=""></span>
+                        <p><strong>Bumper</strong> — solid; kicks the ball away hard.
+                           <strong>+3,000</strong> per hit.</p></div>
+                    <div class="guide-row"><span class="guide-ico ico-grabber"><img src="/pinball/tools/grabber.png" alt=""></span>
+                        <p><strong>Grabber</strong> — catches the ball, holds it a beat, then drops
+                           it from the shape's lowest point. <strong>+10,000</strong> per catch.</p></div>
+                    <div class="guide-row"><span class="guide-ico ico-point"><img src="/pinball/tools/point.png" alt=""></span>
+                        <p><strong>Point</strong> — the ball rolls straight through it.
+                           <strong>+1,000</strong> per pass.</p></div>
+                    <div class="guide-row"><span class="guide-ico ico-boss"><img src="/pinball/tools/boss.png" alt=""></span>
+                        <p><strong>Boss</strong> — the ball rolls through it, lighting it up.
+                           Light every boss on the board for the JACKPOT: <strong>+1,000,000</strong>.</p></div>
+
+                    <h4 class="panel-subheading">The menus (&#9776;)</h4>
+                    <div class="guide-row"><p><strong>ARCADE</strong> — everyone's published machines.
+                       Pick one, hit PLAY, chase its leaderboard. Browsing and playing are free.</p></div>
+                    <div class="guide-row"><p><strong>MACHINE SHOP</strong> — your own saved machines on
+                       this device, plus "Create New Machine" (account required).</p></div>
+                    <div class="guide-row"><p><strong>COSMETICS</strong> — reskin the overlay, plunger,
+                       flippers or ball: download a part's template, draw on it, upload it back.
+                       The eye toggles hide your Drawn components or the Default wall so only your overlay art shows.
+                       Below that, swap any sound effect — or the music — for your own audio.
+                       Custom skins and sounds need an account.</p></div>
+                    <div class="guide-row"><p><strong>SAVE</strong> — name it, describe it, then Save
+                       (to your Machine Shop) or Publish (to the public Arcade). Both need an
+                       account.</p></div>
+                    <div class="guide-row"><p><strong>PROFILE</strong> — pinned at the bottom: log in or
+                       register, edit your name and avatar, or set a custom background for the app.
+                       Your profile rides along with your published machines and high scores.</p></div>
+
+                    <h4 class="panel-subheading">How to play</h4>
+                    <div class="guide-row"><p><strong>Launch</strong> — hold <strong>LAUNCH</strong>
+                       under the board to pull the plunger, let go to fire.</p></div>
+                    <div class="guide-row"><p><strong>Flippers</strong> — hold
+                       <strong>&#9664;</strong> / <strong>&#9654;</strong> under the board. Both at
+                       once is fine: those buttons sit outside the board's pinch gesture, so a
+                       second finger there flips instead of zooming.</p></div>
+                    <div class="guide-row"><p><strong>Modes</strong> — the editor gives you endless test
+                       balls. For a real 3-ball game tap CLASSIC (full-table view) or FANTASIES
+                       (the camera rides with the ball) on the bar the logo reveals. In a mode, the
+                       &times; at the scoreboard's right corner leaves and <strong>TV</strong> on the
+                       left corner opens the CRT and mosaic filters. Lose all three balls and the
+                       high scores come up; on a published machine your best score posts to its
+                       leaderboard automatically while you are signed in.</p></div>
+
+                    <h4 class="panel-subheading">Only with a keyboard</h4>
+                    <p class="guide-note">Two things a touch screen cannot reach: perfect
+                       <strong>circles</strong> (hold <kbd>C</kbd> and drag out from the centre), and
+                       adding one more piece to a selection (<kbd>Shift</kbd>-click) — on a phone,
+                       box-select around them instead. Everything else is here.</p>
+                  </div><!-- /.guide-body--touch -->
                 </div>
                 <button id="btn-guide-back" class="btn btn-secondary">BACK</button>
             </div>
@@ -791,6 +906,6 @@
             </div><!-- /.panel-scroll -->
         </div>
     </div>
-
+
 </body>
 </html>

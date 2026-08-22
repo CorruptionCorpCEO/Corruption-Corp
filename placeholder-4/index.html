@@ -66,6 +66,25 @@
       }
     </script>
     <script>
+      // PWA install ("INSTALL HOME PAGE" on the menu wheel — see
+      // src/installPrompt.js). Chromium fires `beforeinstallprompt` ONCE, and
+      // routinely before the app bundle has parsed — miss it and there is no
+      // way to raise the install sheet for the rest of the visit. So it is
+      // caught here, at the earliest point in the document, and parked for the
+      // UI to use whenever the visitor gets round to tapping.
+      window.__ccInstall = null
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault() // suppress Chrome's own mini-infobar; we have a button
+        window.__ccInstall = e
+        window.dispatchEvent(new Event('cc-install-ready'))
+      })
+      window.addEventListener('appinstalled', function () {
+        window.__ccInstall = null
+        window.__ccInstalled = true // sticky: this TAB is still in the browser
+        window.dispatchEvent(new Event('cc-install-done'))
+      })
+    </script>
+    <script>
       // Paint the background dark BEFORE React mounts when dark mode is saved,
       // so a refresh in dark mode never flashes the light background first.
       try {
@@ -92,8 +111,8 @@
         }
       } catch (e) {}
     </script>
-    <script type="module" crossorigin src="/assets/index-BVMhV379.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-DR3m4VeO.css">
+    <script type="module" crossorigin src="/assets/index-BNE9v4-I.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-BotRAG84.css">
   </head>
   <body>
     <div id="root"></div>
