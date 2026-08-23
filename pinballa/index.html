@@ -113,8 +113,8 @@
             to { transform: rotate(360deg); }
         }
     </style>
-  <script type="module" crossorigin src="/pinball/assets/index-CuQf-sf_.js"></script>
-  <link rel="stylesheet" crossorigin href="/pinball/assets/index-DUdT_wYE.css">
+  <script type="module" crossorigin src="/pinball/assets/index-GhXsq93N.js"></script>
+  <link rel="stylesheet" crossorigin href="/pinball/assets/index-B9Qzxouc.css">
 </head>
 <body>
     <div id="pinballa-splash" role="status" aria-label="Loading">
@@ -781,14 +781,16 @@
                      way home — which is why it sits outside the auth switch and
                      shows in both states. -->
                 <div id="panel-profile">
-                    <!-- Three children, and the ORDER is the layout: the name
-                         takes the whole top line, then the avatar and the label
-                         wrap onto a second one, bottom-left and bottom-right.
-                         No wrapper element around the two lines — the button
-                         itself is the wrapping flex row (see the CSS). -->
+                    <!-- Two lines: the avatar and the name side by side (and
+                         the same height — see --pp-line), then "View profile"
+                         under them. The name sits in its own CLIP box because a
+                         name too long for the card marquees inside it, and the
+                         thing that slides can't also be the thing that clips. -->
                     <button type="button" id="panel-profile-card" title="View your profile" data-tilt>
-                        <span id="panel-profile-name">No Name</span>
-                        <img id="panel-profile-pic" alt="">
+                        <span class="panel-profile-id">
+                            <img id="panel-profile-pic" alt="">
+                            <span class="panel-profile-nameclip"><span id="panel-profile-name">No Name</span></span>
+                        </span>
                         <span class="panel-profile-sub">View profile</span>
                     </button>
                     <button type="button" id="panel-profile-login" data-tilt>
