@@ -113,8 +113,8 @@
             to { transform: rotate(360deg); }
         }
     </style>
-  <script type="module" crossorigin src="/pinball/assets/index-B5NBrj_M.js"></script>
-  <link rel="stylesheet" crossorigin href="/pinball/assets/index-CyiO8AhZ.css">
+  <script type="module" crossorigin src="/pinball/assets/index-CuQf-sf_.js"></script>
+  <link rel="stylesheet" crossorigin href="/pinball/assets/index-DUdT_wYE.css">
 </head>
 <body>
     <div id="pinballa-splash" role="status" aria-label="Loading">
@@ -774,19 +774,22 @@
 
                 <!-- Profile — PINNED footer: stays put while the panel scrolls.
                      Shows a signed-in card or a login prompt (auth state, JS),
-                     sharing the row half-and-half with the way back to the
-                     Corruption Corp site. That link is NOT optional chrome:
+                     sharing the row 60/40 with the way back to the Corruption
+                     Corp site (the card carries two lines now — see the CSS). That link is NOT optional chrome:
                      Pinballa opens in the same tab now (the Programs menu
                      navigates rather than window.open-ing), so this is the only
                      way home — which is why it sits outside the auth switch and
                      shows in both states. -->
                 <div id="panel-profile">
+                    <!-- Three children, and the ORDER is the layout: the name
+                         takes the whole top line, then the avatar and the label
+                         wrap onto a second one, bottom-left and bottom-right.
+                         No wrapper element around the two lines — the button
+                         itself is the wrapping flex row (see the CSS). -->
                     <button type="button" id="panel-profile-card" title="View your profile" data-tilt>
+                        <span id="panel-profile-name">No Name</span>
                         <img id="panel-profile-pic" alt="">
-                        <span class="panel-profile-meta">
-                            <span id="panel-profile-name">No Name</span>
-                            <span class="panel-profile-sub">View profile</span>
-                        </span>
+                        <span class="panel-profile-sub">View profile</span>
                     </button>
                     <button type="button" id="panel-profile-login" data-tilt>
                         <span class="panel-profile-login-title">Not signed in</span>
