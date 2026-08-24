@@ -112,9 +112,9 @@
         @keyframes pinballaSplashSpin {
             to { transform: rotate(360deg); }
         }
-    </style>
-  <script type="module" crossorigin src="/pinball/assets/index-GhXsq93N.js"></script>
-  <link rel="stylesheet" crossorigin href="/pinball/assets/index-B9Qzxouc.css">
+    </style>
+  <script type="module" crossorigin src="/pinball/assets/index-TRs3X7NT.js"></script>
+  <link rel="stylesheet" crossorigin href="/pinball/assets/index-Bo8WBhdX.css">
 </head>
 <body>
     <div id="pinballa-splash" role="status" aria-label="Loading">
@@ -781,17 +781,18 @@
                      way home — which is why it sits outside the auth switch and
                      shows in both states. -->
                 <div id="panel-profile">
-                    <!-- Two lines: the avatar and the name side by side (and
-                         the same height — see --pp-line), then "View profile"
-                         under them. The name sits in its own CLIP box because a
-                         name too long for the card marquees inside it, and the
-                         thing that slides can't also be the thing that clips. -->
+                    <!-- One line: the avatar and the name side by side, and the
+                         same height (see --pp-line). It used to carry a "View
+                         profile" caption under them; the button is the avatar
+                         and the name now, and `title` still says what it does.
+                         The name sits in its own CLIP box because a name too
+                         long for the card marquees inside it, and the thing
+                         that slides can't also be the thing that clips. -->
                     <button type="button" id="panel-profile-card" title="View your profile" data-tilt>
                         <span class="panel-profile-id">
                             <img id="panel-profile-pic" alt="">
                             <span class="panel-profile-nameclip"><span id="panel-profile-name">No Name</span></span>
                         </span>
-                        <span class="panel-profile-sub">View profile</span>
                     </button>
                     <button type="button" id="panel-profile-login" data-tilt>
                         <span class="panel-profile-login-title">Not signed in</span>
@@ -911,6 +912,6 @@
             </div><!-- /.panel-scroll -->
         </div>
     </div>
-
+
 </body>
 </html>
