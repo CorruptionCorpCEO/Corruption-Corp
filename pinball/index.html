@@ -113,8 +113,8 @@
             to { transform: rotate(360deg); }
         }
     </style>
-  <script type="module" crossorigin src="/pinball/assets/index-BcX_HUCF.js"></script>
-  <link rel="stylesheet" crossorigin href="/pinball/assets/index-Bo8WBhdX.css">
+  <script type="module" crossorigin src="/pinball/assets/index-CB9lGqB_.js"></script>
+  <link rel="stylesheet" crossorigin href="/pinball/assets/index-F6gkfNtn.css">
 </head>
 <body>
     <div id="pinballa-splash" role="status" aria-label="Loading">
@@ -132,7 +132,7 @@
     <!-- Profile Modal (Popup) -->
     <div id="profile-modal" class="modal-backdrop">
         <div id="profile-container" class="panel profile-panel">
-            <button id="btn-close-profile" class="btn-close" aria-label="Close">&times;</button>
+            <button id="btn-close-profile" class="btn-close" aria-label="Close"><img src="/pinball/ui/pinballa-exit.png" alt="" draggable="false"></button>
             <!-- The panel itself must never clip (the close chip straddles its
                  corner), so the phone-height scroll lives on this wrapper. -->
             <div class="panel-scroll">
@@ -255,7 +255,7 @@
          full how-to; BACK returns to the box. -->
     <div id="welcome-modal" class="modal-backdrop">
         <div class="panel welcome-panel">
-            <button id="btn-close-welcome" class="btn-close" aria-label="Close">&times;</button>
+            <button id="btn-close-welcome" class="btn-close" aria-label="Close"><img src="/pinball/ui/pinballa-exit.png" alt="" draggable="false"></button>
 
             <div id="welcome-home">
                 <img class="welcome-logo" src="/pinball/ui/pinballa-logo.png" alt="Pinballa" draggable="false">
@@ -521,8 +521,8 @@
 
         </div>
 
-        <button id="btn-exit-fantasies" class="mode-exit-btn" aria-label="Exit Fantasies">&times;</button>
-        <button id="btn-exit-classic" class="mode-exit-btn" aria-label="Exit Classic">&times;</button>
+        <button id="btn-exit-fantasies" class="mode-exit-btn" aria-label="Exit Fantasies"><img src="/pinball/ui/pinballa-exit.png" alt="" draggable="false"></button>
+        <button id="btn-exit-classic" class="mode-exit-btn" aria-label="Exit Classic"><img src="/pinball/ui/pinballa-exit.png" alt="" draggable="false"></button>
         <!-- TV filters (classic/fantasies): CRT + mosaic strengths, and the
              classic-only board-angle tilt. Wired in script.js (tvSettings).
              The X/TV buttons pin to the scoreboard's top corners (JS:
@@ -811,7 +811,7 @@
             <div class="arcade-modal-header">
                 <h2 id="arcade-modal-title">Pinball Machines</h2>
                 <div class="btn-row">
-                    <button id="btn-close-arcade" class="btn-close btn-close-inline" aria-label="Close">&times;</button>
+                    <button id="btn-close-arcade" class="btn-close btn-close-inline" aria-label="Close"><img src="/pinball/ui/pinballa-exit.png" alt="" draggable="false"></button>
                 </div>
             </div>
             <!-- Sort filter — only shown for the PUBLIC arcade (script.js).
@@ -824,11 +824,14 @@
             </div>
             <div id="arcade-list"></div>
             <!-- Floating action, pinned to the window's bottom-right corner
-                 (see .arcade-modal-content). #arcade-list reserves room under
-                 the grid so the last row never sits behind it. -->
-            <button id="btn-new-machine" class="btn btn-primary">
-                <span class="nm-line-1">Create</span>
-                <span class="nm-line-2">New Machine</span>
+                 (see .arcade-modal-content). It is the create-machine ICON now,
+                 not the old two-line "Create / New Machine" label, so the title
+                 attribute and aria-label carry the wording. #arcade-list reserves
+                 room under the grid so the last row never sits behind it, computed
+                 from this button's own size — see --nm-* in style.css. -->
+            <button id="btn-new-machine" class="btn btn-primary"
+                    aria-label="Create new machine" title="Create New Machine">
+                <img src="/pinball/ui/create-machine-icon.png" alt="" draggable="false">
             </button>
         </div>
     </div>
@@ -836,7 +839,7 @@
     <div id="arcade-detail-modal">
         <!-- Close chip lives OUT here, on the modal itself: .arcade-detail-content
              is `overflow: hidden` and would slice the corner-straddling X. -->
-        <button id="btn-close-detail" class="btn-close" aria-label="Close">&times;</button>
+        <button id="btn-close-detail" class="btn-close" aria-label="Close"><img src="/pinball/ui/pinballa-exit.png" alt="" draggable="false"></button>
         <div class="arcade-detail-content">
             <!-- Mode Selection Overlay -->
             <div id="mode-selection-overlay">
@@ -893,7 +896,7 @@
          published machines and the machines they've upvoted. -->
     <div id="public-profile-modal" class="modal-backdrop">
         <div class="panel public-profile-panel">
-            <button id="btn-close-public-profile" class="btn-close" aria-label="Close">&times;</button>
+            <button id="btn-close-public-profile" class="btn-close" aria-label="Close"><img src="/pinball/ui/pinballa-exit.png" alt="" draggable="false"></button>
             <!-- Scroll on the wrapper, not the panel — the panel must not clip
                  the corner-straddling close chip. -->
             <div class="panel-scroll">
