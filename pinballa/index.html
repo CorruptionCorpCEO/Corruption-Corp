@@ -113,8 +113,8 @@
             to { transform: rotate(360deg); }
         }
     </style>
-  <script type="module" crossorigin src="/pinball/assets/index-CB9lGqB_.js"></script>
-  <link rel="stylesheet" crossorigin href="/pinball/assets/index-F6gkfNtn.css">
+  <script type="module" crossorigin src="/pinball/assets/index-dGakgP5f.js"></script>
+  <link rel="stylesheet" crossorigin href="/pinball/assets/index-7nyCAkmc.css">
 </head>
 <body>
     <div id="pinballa-splash" role="status" aria-label="Loading">
@@ -824,12 +824,13 @@
             </div>
             <div id="arcade-list"></div>
             <!-- Floating action, pinned to the window's bottom-right corner
-                 (see .arcade-modal-content). It is the create-machine ICON now,
-                 not the old two-line "Create / New Machine" label, so the title
-                 attribute and aria-label carry the wording. #arcade-list reserves
-                 room under the grid so the last row never sits behind it, computed
-                 from this button's own size — see --nm-* in style.css. -->
-            <button id="btn-new-machine" class="btn btn-primary"
+                 (see .arcade-modal-content). It is the bare create-machine ICON
+                 now — no .btn/.btn-primary plate behind it — where it used to be
+                 a two-line "Create / New Machine" label, so the title attribute
+                 and aria-label are what carry the wording. #arcade-list reserves
+                 room under the grid so the last row never sits behind it,
+                 computed from this button's own size — see --nm-* in style.css. -->
+            <button id="btn-new-machine"
                     aria-label="Create new machine" title="Create New Machine">
                 <img src="/pinball/ui/create-machine-icon.png" alt="" draggable="false">
             </button>
