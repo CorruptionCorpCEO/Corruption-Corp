@@ -113,8 +113,8 @@
             to { transform: rotate(360deg); }
         }
     </style>
-  <script type="module" crossorigin src="/pinball/assets/index-CJF3tI3b.js"></script>
-  <link rel="stylesheet" crossorigin href="/pinball/assets/index-Dxui6TIP.css">
+  <script type="module" crossorigin src="/pinball/assets/index-BkkYfESU.js"></script>
+  <link rel="stylesheet" crossorigin href="/pinball/assets/index-C3uDEblq.css">
 </head>
 <body>
     <div id="pinballa-splash" role="status" aria-label="Loading">
@@ -798,8 +798,13 @@
                         <span class="panel-profile-login-title">Not signed in</span>
                         <span class="panel-profile-login-sub">Log in or register to save, publish &amp; add custom skins</span>
                     </button>
+                    <!-- Two-step: the first press swaps the mark for EXIT?,
+                         the second follows the link. Leaving is a one-way trip
+                         out of the app and this sits right beside the profile
+                         card, so it is easy to hit by accident on a phone. -->
                     <a id="panel-profile-home" href="/" title="Back to Corruption Corp" aria-label="Back to Corruption Corp" data-tilt>
                         <img src="/pinball/ui/cclogo.png" alt="Corruption Corp" draggable="false">
+                        <span class="ph-confirm" aria-hidden="true">EXIT?</span>
                     </a>
                 </div>
             </div>
@@ -886,6 +891,11 @@
                 </div>
                 <div class="arcade-detail-actions">
                     <button id="btn-detail-play" class="btn btn-primary">PLAY</button>
+                    <!-- Published machines you wrote: edit straight from the
+                         arcade. Shown by script.js only for your own, and only
+                         when the shop copy is NOT what you are looking at (a
+                         shop copy's own PLAY button already says EDIT). -->
+                    <button id="btn-detail-edit" class="btn btn-secondary">EDIT</button>
                     <button id="btn-detail-delete" class="btn btn-danger">DELETE</button>
                 </div>
             </div>
