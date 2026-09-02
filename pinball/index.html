@@ -113,8 +113,8 @@
             to { transform: rotate(360deg); }
         }
     </style>
-  <script type="module" crossorigin src="/pinball/assets/index-CJ4gGGLx.js"></script>
-  <link rel="stylesheet" crossorigin href="/pinball/assets/index-DA7rE-0E.css">
+  <script type="module" crossorigin src="/pinball/assets/index-BNJQqQsV.js"></script>
+  <link rel="stylesheet" crossorigin href="/pinball/assets/index-_PFRCovo.css">
 </head>
 <body>
     <div id="pinballa-splash" role="status" aria-label="Loading">
@@ -477,7 +477,16 @@
 
     <div id="app-container">
         <div id="left-column">
-            <img id="logo-rectangle" src="/pinball/ui/pinballa-logo.png" alt="Pinballa" draggable="false">
+            <!-- Two images, not a src swap. A GIF <img> restarts its animation
+                 from frame 1 the instant its src is set again — even to the
+                 SAME url — so a naive toggle re-lit the wordmark from scratch
+                 every time. Once armed, the lit copy stays mounted and just
+                 keeps playing behind the still one; toggling only moves which
+                 layer is on top (see the click handler in script.js), so
+                 turning it back on resumes exactly where the animation was. -->
+            <div id="logo-rectangle">
+                <img id="logo-still" src="/pinball/ui/pinballa-logo.png" alt="Pinballa" draggable="false">
+            </div>
 
             <div id="editor-panel">
             <!-- Tool / component buttons are 3D shiny white "chips" (see the
