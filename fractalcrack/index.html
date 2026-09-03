@@ -1543,19 +1543,26 @@ function scheduleAlloc(){ clearTimeout(allocTimer); allocTimer = setTimeout(allo
 window.addEventListener("resize", scheduleAlloc);
 
 /* ------------------------------------------------------------------ */
-/*  Boot splash — same functionality as the Corruption Corp site's own       */
-/*  splash and Pinballa's take on it: hold the splash up until the HUD's own */
-/*  art (logo, console icons/knobs) has decoded and CRENZO is in, so nothing */
-/*  pops or reflows behind the fade. Deliberately does NOT wait on           */
-/*  document.fonts.ready — that resolves only once every requested font has  */
-/*  settled, including the Google-hosted IBM Plex Mono fallback nothing here */
-/*  actually renders in until CRENZO fails, so a slow/blocked font CDN would */
-/*  hold the splash hostage to a font this HUD isn't even using. Broken      */
-/*  assets resolve rather than reject, and SPLASH_MAX_WAIT keeps a stalled   */
-/*  request from parking the splash on screen; the inline script right      */
-/*  after <body> is the last-resort backstop behind both.                   */
+/*  Boot splash — same shape as the Corruption Corp site's own splash and    */
+/*  Pinballa's take on it, but this one waits for EVERY asset rather than    */
+/*  racing them against a cutoff. Pinballa's version drops its splash after  */
+/*  SPLASH_MAX_WAIT whether or not the art is in, which on a slow connection */
+/*  is exactly the pop-and-reflow the splash exists to hide; here the fade   */
+/*  waits on all of it — every <img> in the document (splash logo, hud logo, */
+/*  every console icon, knob base and pointer) plus CRENZO itself.           */
+/*                                                                          */
+/*  Two deliberate exceptions to "everything":                              */
+/*  - Broken assets resolve rather than reject (error counts as settled), so */
+/*    one 404 can't strand the boot.                                        */
+/*  - It does NOT wait on document.fonts.ready, which only settles once      */
+/*    EVERY requested font has, including the Google-hosted IBM Plex Mono    */
+/*    fallback nothing renders in unless CRENZO fails — a slow or blocked    */
+/*    font CDN would otherwise hold the splash hostage to a font this HUD    */
+/*    never actually uses.                                                  */
+/*                                                                          */
+/*  The 8s timer in the inline script after <body> is the only ceiling left, */
+/*  and it's a true last resort: a request that never settles at all.        */
 /* ------------------------------------------------------------------ */
-const SPLASH_MAX_WAIT = 4000;
 function hideSplashWhenDressed(){
   const splash = document.getElementById("fc-splash");
   if(!splash) return;
@@ -1563,16 +1570,14 @@ function hideSplashWhenDressed(){
   const waits = [];
   for(const im of document.querySelectorAll("img[src]")){
     if(im.complete) continue;               // decoded already (or already failed)
-    if(!im.getClientRects().length) continue; // not actually on screen
     waits.push(new Promise(res => {
       im.addEventListener("load", res, {once:true});
       im.addEventListener("error", res, {once:true});
     }));
   }
   if(document.fonts) waits.push(document.fonts.load('1em CRENZO').catch(() => {}));
-  waits.push(new Promise(res => setTimeout(res, SPLASH_MAX_WAIT))); // never hangs
 
-  Promise.race([Promise.all(waits.slice(0, -1)), waits[waits.length - 1]]).then(() => {
+  Promise.all(waits).then(() => {
     // One painted frame with everything in place, so the fade reveals the
     // finished console instead of the frame it was assembled on. rAF is
     // dead in a background tab, so skip the wait there.
