@@ -1,0 +1,1186 @@
+<!--
+  This is Fractal Crack's app copy, served directly at corruptioncorp.net/fractalcrack
+  (see data/programs/FractalCrack/page.txt and data/site/README.txt). Its asset
+  paths are root-absolute (/fractalcrack/assets/...) rather than relative,
+  because the route it's served from (/fractalcrack, no trailing slash) would
+  otherwise resolve a relative "assets/..." against the site ROOT, not this
+  folder — same reason Pinballa's own build bases its assets at /pinball/.
+  The standalone dev copy (originally D:\Claude\Fractal Crack) keeps plain
+  relative paths, since it's served from its own root.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fractal Crack</title>
+<!-- The route plugin (vite.config.js) leaves an app-program's own html alone —
+     no seo:start/end markers here, unlike the site shell — so this head is
+     the actual search result / share card. Mirrors Pinballa's own head. -->
+<meta name="description" content="Fractal Crack is a live analog video-feedback fractal generator: turn knobs for camera, signal, feedback and seed injection and watch a real-time WebGL feedback loop fold back on itself." />
+<link rel="canonical" href="https://corruptioncorp.net/fractalcrack/" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Corruption Corp" />
+<meta property="og:title" content="Fractal Crack" />
+<meta property="og:description" content="A live analog video-feedback fractal generator: turn knobs for camera, signal, feedback and seed injection and watch a real-time WebGL feedback loop fold back on itself." />
+<meta property="og:url" content="https://corruptioncorp.net/fractalcrack/" />
+<meta property="og:image" content="https://corruptioncorp.net/share/fractalcrack.png" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Fractal Crack" />
+<meta name="twitter:description" content="A live analog video-feedback fractal generator: turn knobs for camera, signal, feedback and seed injection and watch a real-time WebGL feedback loop fold back on itself." />
+<meta name="twitter:image" content="https://corruptioncorp.net/share/fractalcrack.png" />
+<meta name="theme-color" content="#000000" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+@font-face{
+  font-family:"CRENZO";
+  src:url("/fractalcrack/assets/fonts/CRENZO.ttf") format("truetype");
+  font-display:swap;
+}
+:root{
+  --cell: clamp(42px, 4.1vw, 66px);
+  --gap: calc(var(--cell) * 0.13);
+  --hud-fade: .45s ease;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  background:#000;
+  color:#e8ecf2;
+  font-family:"CRENZO","IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  overflow:hidden;
+}
+
+/* ---------- viewport ---------- */
+#gl{
+  position:fixed; inset:0;
+  width:100%; height:100%;
+  display:block;
+  z-index:0;
+}
+
+/* ---------- hud shell ---------- */
+.hud{
+  position:fixed; inset:0;
+  z-index:10;
+  pointer-events:none;
+  opacity:1;
+  transition:opacity var(--hud-fade);
+}
+.hud.idle{opacity:0}
+.hud > *{pointer-events:auto}
+/* faded out means gone — an invisible console must not eat canvas clicks */
+.hud.idle, .hud.idle *{pointer-events:none}
+
+/* ---------- logo ---------- */
+#logo{
+  position:absolute; top:18px; left:20px;
+  width:25vw;               /* one quarter of the viewport */
+  min-width:120px;
+  height:auto;
+  user-select:none;
+  -webkit-user-drag:none;
+  filter:drop-shadow(0 3px 14px rgba(0,0,0,.75));
+}
+
+/* ---------- console ---------- */
+#console{
+  position:absolute; top:16px; right:18px;
+  display:flex;
+  gap:var(--gap);
+  align-items:flex-start;
+}
+.col{
+  display:flex; flex-direction:column;
+  gap:var(--gap);
+}
+
+.cell{
+  position:relative;
+  width:var(--cell); height:var(--cell);
+  display:block;
+  border:0; padding:0; margin:0;
+  background:transparent;
+  cursor:pointer;
+  border-radius:50%;
+  filter:drop-shadow(0 2px 8px rgba(0,0,0,.65));
+}
+.cell.hdr{cursor:default}
+.cell img{
+  position:absolute; inset:0;
+  width:100%; height:100%;
+  pointer-events:none;
+  -webkit-user-drag:none;
+}
+.cell .glyph{
+  position:absolute;
+  left:19%; top:19%; width:62%; height:62%;
+  pointer-events:none;
+}
+.cell .hand{
+  transform-origin:50% 50%;
+  will-change:transform;
+}
+/* selection ring */
+.cell::after{
+  content:"";
+  position:absolute; inset:-5%;
+  border-radius:50%;
+  border:2px solid #fff;
+  opacity:0;
+  transition:opacity .12s;
+  pointer-events:none;
+  box-shadow:0 0 10px rgba(255,255,255,.5);
+}
+.cell.sel::after{opacity:1}
+.cell:focus-visible{outline:2px solid #fff; outline-offset:3px}
+
+/* group recolouring — the sprites ship red, greys are untouched by hue-rotate */
+.g-controls .tint{filter:grayscale(1) brightness(1.06)}
+.g-camera   .tint{filter:hue-rotate(240deg)}
+.g-signal   .tint{filter:hue-rotate(40deg)}
+.g-feedback .tint{filter:none}
+.g-seed     .tint{filter:hue-rotate(131deg)}
+.g-display  .tint{filter:hue-rotate(282deg)}
+
+/* ---------- legend ---------- */
+#legend{
+  position:absolute; left:22px; bottom:22px;
+  min-width:210px; max-width:330px;
+  background:#fff;
+  border:1px solid var(--accent,#6b7280);
+  border-left-width:3px;
+  border-radius:8px;
+  padding:11px 14px 12px;
+  backdrop-filter:blur(8px);
+  opacity:0;
+  transform:translateY(6px);
+  transition:opacity .14s, transform .14s;
+}
+#legend.show{opacity:1; transform:translateY(0)}
+#legend .lg-group{
+  font-size:9.5px; letter-spacing:.24em; text-transform:uppercase;
+  color:var(--accent,#9aa3af);
+  margin-bottom:3px;
+  padding-right:22px;
+}
+#legend .lg-title{
+  font-size:14px; font-weight:600; color:#000; line-height:1.2;
+  padding-right:22px;
+}
+#lgClose{
+  position:absolute; top:7px; right:8px;
+  width:20px; height:20px;
+  display:grid; place-items:center;
+  padding:0; border-radius:5px;
+  border:1px solid rgba(255,255,255,.14);
+  background:transparent;
+  color:#8b93a1;
+  font-family:inherit; font-size:14px; line-height:1;
+  cursor:pointer;
+  transition:color .12s, border-color .12s, background .12s;
+}
+#lgClose:hover{
+  color:#fff;
+  border-color:var(--accent,#fff);
+  background:rgba(255,255,255,.09);
+}
+#lgClose[hidden]{display:none}
+#legend .lg-value{
+  margin-top:7px;
+  font-size:21px; font-weight:500;
+  color:var(--accent,#fff);
+  font-variant-numeric:tabular-nums;
+}
+#legend .lg-opts{
+  margin-top:8px; display:flex; flex-wrap:wrap; gap:4px;
+}
+#legend .lg-opts button{
+  font-family:inherit;
+  font-size:10px; letter-spacing:.05em; text-transform:uppercase;
+  padding:4px 8px; border-radius:4px;
+  border:1px solid rgba(255,255,255,.16);
+  background:transparent;
+  color:#8b93a1;
+  cursor:pointer;
+  transition:border-color .12s, color .12s, background .12s;
+}
+#legend .lg-opts button:hover{
+  border-color:var(--accent,#fff);
+  color:#e8ecf2;
+}
+#legend .lg-opts button.on{
+  border-color:var(--accent,#fff);
+  color:#fff;
+  background:rgba(255,255,255,.09);
+}
+#legend .lg-lock{
+  margin-top:8px; font-size:9.5px; letter-spacing:.16em;
+  text-transform:uppercase; color:#6f7683;
+}
+
+.nogl{
+  position:fixed; inset:0; display:grid; place-items:center;
+  padding:40px; text-align:center; color:#8b93a1; z-index:20;
+}
+
+@media (prefers-reduced-motion:reduce){
+  .hud,#legend,.cell::after{transition:none}
+}
+</style>
+</head>
+<body>
+<canvas id="gl" aria-label="Video feedback fractal"></canvas>
+
+<div class="hud" id="hud">
+  <img id="logo" src="/fractalcrack/assets/fractalcrack-logo.png" alt="Fractal Crack">
+  <div id="console"></div>
+  <div id="legend" role="status" aria-live="polite">
+    <button id="lgClose" type="button" title="Deselect" aria-label="Deselect" hidden>&times;</button>
+    <div class="lg-group" id="lgGroup"></div>
+    <div class="lg-title" id="lgTitle"></div>
+    <div class="lg-value" id="lgValue"></div>
+    <div class="lg-opts" id="lgOpts"></div>
+    <div class="lg-lock" id="lgLock"></div>
+  </div>
+</div>
+
+<input type="file" id="fileIn" accept="image/png,image/jpeg,image/webp" hidden>
+
+<script>
+(function(){
+"use strict";
+
+const cvs = document.getElementById("gl");
+const gl = cvs.getContext("webgl2", {antialias:false, preserveDrawingBuffer:false});
+if(!gl){
+  document.body.insertAdjacentHTML("beforeend",
+    '<div class="nogl">This needs WebGL2, which this browser did not provide.</div>');
+  return;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Parameters                                                          */
+/* ------------------------------------------------------------------ */
+/* Defaults are the instrument at rest: every optional effect sits at zero, and
+   only the knobs the feedback loop cannot run without carry a working value.
+   Those three exceptions are zoom (at 1.000 nothing recurses, so there is no
+   fractal at all), gain (an analog loop needs sub-unity gain or the sharpener
+   runs it up to white), and the seed (with nothing injected the loop starves
+   and fades to black). */
+const P = {
+  // camera — zoom drives the recursion; the rest are offsets, off at 0
+  zoom:1.012, rot:0, panX:0, panY:0, warp:0,
+  // signal — trims rest at neutral (1.000 / 0), gain and sharpness excepted
+  bright:0, contrast:1.0, sat:1.0, hue:0, decay:0.9985, sharp:0.35,
+  // feedback — all character, none of it on until asked for
+  bleed:0, delayFrames:0, delayMix:0, edge:3,
+  kaleido:0, mirrorX:0, invert:0,
+  // seed — shape/amount/size keep the loop alive; drift is an effect, off
+  seedShape:2, seedAmt:0.25, seedSize:0.045, seedDrift:0,
+  // display — post effects off; iters and res are quality, not effects
+  bloom:0, scan:0, iters:1, res:0.70
+};
+const DEFAULTS = Object.assign({}, P);
+const EDGES  = ["mirror","wrap","clamp","black"];
+const SHAPES = ["none","dot","ring","bar","noise"];
+const CUSTOM_INDEX = 5;
+
+/* ------------------------------------------------------------------ */
+/*  Shaders                                                            */
+/* ------------------------------------------------------------------ */
+const VERT = `#version 300 es
+in vec2 a; out vec2 v;
+void main(){ v = a*0.5+0.5; gl_Position = vec4(a,0.0,1.0); }`;
+
+const COMMON = `
+vec2 mirrorRepeat(vec2 p){
+  p = mod(p, 2.0);
+  p = mix(p, 2.0 - p, step(1.0, p));
+  return p;
+}
+float hash(vec2 p){
+  p = fract(p*vec2(123.34,456.21));
+  p += dot(p, p+45.32);
+  return fract(p.x*p.y);
+}
+vec3 hueRotate(vec3 c, float a){
+  const mat3 toYIQ = mat3(0.299,0.596,0.211, 0.587,-0.274,-0.523, 0.114,-0.322,0.312);
+  const mat3 toRGB = mat3(1.0,1.0,1.0, 0.956,-0.272,-1.106, 0.621,-0.647,1.703);
+  vec3 yiq = toYIQ*c;
+  float cs=cos(a), sn=sin(a);
+  yiq.yz = mat2(cs,-sn,sn,cs)*yiq.yz;
+  return toRGB*yiq;
+}`;
+
+const FRAG_SEED = `#version 300 es
+precision highp float;
+in vec2 v; out vec4 o;
+uniform float uTime; uniform float uAspect;
+${COMMON}
+void main(){
+  vec2 p = v - 0.5; p.x *= uAspect;
+  float r = length(p);
+  vec3 c = 0.5 + 0.5*cos(vec3(0.0,2.1,4.2) + r*11.0 - uTime*0.6);
+  c *= smoothstep(0.62, 0.0, r);
+  c += 0.04*hash(v*57.0 + uTime);
+  o = vec4(c, 1.0);
+}`;
+
+const FRAG_FEEDBACK = `#version 300 es
+precision highp float;
+in vec2 v; out vec4 o;
+uniform sampler2D uPrev, uDelay, uCustom;
+uniform vec2 uCenter, uPx;
+uniform float uTime, uAspect;
+uniform float uZoom, uRot, uWarp;
+uniform vec2 uPan;
+uniform float uBright, uContrast, uSat, uHue, uGain, uSharp;
+uniform float uBleed, uDelayMix;
+uniform int uEdge, uKaleido, uMirrorX, uInvert;
+uniform int uSeedShape, uHasCustom;
+uniform float uSeedAmt, uSeedSize;
+uniform vec2 uSeedPos;
+${COMMON}
+vec2 fold(vec2 p){
+  if(uEdge==0) return mirrorRepeat(p);
+  if(uEdge==1) return fract(p);
+  if(uEdge==2) return clamp(p, 0.0, 1.0);
+  return p;
+}
+vec3 samp(sampler2D t, vec2 p){
+  if(uEdge==3 && (p.x<0.0||p.x>1.0||p.y<0.0||p.y>1.0)) return vec3(0.0);
+  return texture(t, fold(p)).rgb;
+}
+/* analog gear compresses as it approaches white instead of clipping flat */
+vec3 softClip(vec3 x){
+  const float k = 0.72;
+  vec3 over = k + (1.0-k)*tanh(max(x-k, 0.0)/(1.0-k));
+  return clamp(mix(x, over, step(k, x)), 0.0, 1.0);
+}
+void main(){
+  vec2 p = v - uCenter;
+  p.x *= uAspect;
+
+  /* Rotational repeat only — no mirror fold. Mirroring with
+     abs(ang - seg*0.5) is not idempotent: anything already inside the wedge
+     comes back as seg*0.5 - ang, so re-applying it every pass flips the frame
+     between two mirrored states and flickers at half the frame rate.
+     mod() on its own is idempotent, so the loop settles. */
+  if(uKaleido > 0){
+    float ang = atan(p.y, p.x);
+    float rad = length(p);
+    float seg = 6.2831853 / float(uKaleido);
+    ang = mod(ang, seg);
+    p = vec2(cos(ang), sin(ang)) * rad;
+  }
+  if(uMirrorX == 1) p.x = abs(p.x);
+
+  float c = cos(uRot), s = sin(uRot);
+  p = mat2(c,-s,s,c) * p;
+
+  float r2 = dot(p,p);
+  p *= 1.0 + uWarp*r2;
+
+  p /= uZoom;
+  p.x /= uAspect;
+  p += uCenter + uPan;
+
+  vec2 dir = p - (uCenter + uPan);
+  vec3 col;
+  col.r = samp(uPrev, p + dir*uBleed).r;
+  col.g = samp(uPrev, p).g;
+  col.b = samp(uPrev, p - dir*uBleed).b;
+
+  /* the screen's sharpness control: an unsharp mask, re-applied every loop.
+     This is what keeps regenerating fine detail instead of blurring away. */
+  if(uSharp > 0.001){
+    vec3 blur = samp(uPrev, p + vec2(uPx.x,0.0)*2.5)
+              + samp(uPrev, p - vec2(uPx.x,0.0)*2.5)
+              + samp(uPrev, p + vec2(0.0,uPx.y)*2.5)
+              + samp(uPrev, p - vec2(0.0,uPx.y)*2.5);
+    /* limit the boosted detail, or it compounds into a full-scale checkerboard */
+    vec3 hf = tanh((col - blur*0.25) * 6.0) / 6.0;
+    col += hf * uSharp * 0.9;
+  }
+
+  /* Video delay line. Crossfade with the older frame — a screen blend here
+     would add energy on every pass and run the whole loop up to white. */
+  if(uDelayMix > 0.0001){
+    col = mix(col, samp(uDelay, v), uDelayMix);
+  }
+
+  col *= uGain;
+  col = (col - 0.5) * uContrast + 0.5 + uBright;
+  float l = dot(col, vec3(0.299,0.587,0.114));
+  col = mix(vec3(l), col, uSat);
+  col = hueRotate(col, uHue);
+  if(uInvert == 1) col = 1.0 - col;
+
+  if(uSeedShape > 0 && uSeedAmt > 0.0001){
+    vec2 sp = v - uSeedPos; sp.x *= uAspect;
+    float sz = max(uSeedSize, 0.002);
+    float m = 0.0;
+    vec3 sc = 0.5 + 0.5*cos(uTime*vec3(1.0,1.3,1.7) + vec3(0.0,2.1,4.2));
+    if(uSeedShape == 1) m = smoothstep(sz, 0.0, length(sp));
+    else if(uSeedShape == 2){ float d = abs(length(sp) - sz*2.0); m = smoothstep(sz*0.25, 0.0, d); }
+    else if(uSeedShape == 3) m = smoothstep(sz, 0.0, abs(sp.y)) * step(abs(sp.x), sz*5.0);
+    else if(uSeedShape == 4) m = step(0.985, hash(floor(v*260.0) + floor(uTime*20.0)));
+    else if(uSeedShape == 5 && uHasCustom == 1){
+      /* uploaded png, mapped into a box of the seed size */
+      vec2 q = sp/(sz*5.0)*0.5 + 0.5;
+      if(q.x >= 0.0 && q.x <= 1.0 && q.y >= 0.0 && q.y <= 1.0){
+        vec4 tx = texture(uCustom, vec2(q.x, 1.0 - q.y));
+        m = tx.a;
+        sc = tx.rgb;
+      }
+    }
+    /* Crossfade rather than add: an added seed would drive the loop to
+       seedAmt/(1-gain) and pin the frame at white. */
+    col = mix(col, sc, clamp(m * uSeedAmt, 0.0, 1.0));
+  }
+
+  o = vec4(softClip(max(col, 0.0)), 1.0);
+}`;
+
+const FRAG_DISPLAY = `#version 300 es
+precision highp float;
+in vec2 v; out vec4 o;
+uniform sampler2D uTex;
+uniform vec2 uPx;
+uniform float uBloom, uScan, uLines;
+void main(){
+  vec3 c = texture(uTex, v).rgb;
+  if(uBloom > 0.001){
+    vec3 b = vec3(0.0);
+    b += texture(uTex, v + vec2( 1.5, 0.0)*uPx).rgb;
+    b += texture(uTex, v + vec2(-1.5, 0.0)*uPx).rgb;
+    b += texture(uTex, v + vec2( 0.0, 1.5)*uPx).rgb;
+    b += texture(uTex, v + vec2( 0.0,-1.5)*uPx).rgb;
+    b += texture(uTex, v + vec2( 1.2, 1.2)*uPx).rgb;
+    b += texture(uTex, v + vec2(-1.2, 1.2)*uPx).rgb;
+    b += texture(uTex, v + vec2( 1.2,-1.2)*uPx).rgb;
+    b += texture(uTex, v + vec2(-1.2,-1.2)*uPx).rgb;
+    vec3 hi = max(b/8.0 - 0.45, 0.0);
+    c += hi * uBloom * 1.7;
+  }
+  float sl = 0.5 + 0.5*sin(v.y * uLines * 3.14159265);
+  c *= mix(1.0, 0.82 + 0.18*sl, uScan);
+  float vg = smoothstep(1.15, 0.35, length(v - 0.5));
+  c *= mix(1.0, vg, 0.45);
+  c = pow(max(c, 0.0), vec3(0.92));
+  o = vec4(c, 1.0);
+}`;
+
+/* ------------------------------------------------------------------ */
+/*  GL helpers                                                         */
+/* ------------------------------------------------------------------ */
+function compile(type, src){
+  const sh = gl.createShader(type);
+  gl.shaderSource(sh, src);
+  gl.compileShader(sh);
+  if(!gl.getShaderParameter(sh, gl.COMPILE_STATUS))
+    throw new Error(gl.getShaderInfoLog(sh));
+  return sh;
+}
+function program(fsrc){
+  const pr = gl.createProgram();
+  gl.attachShader(pr, compile(gl.VERTEX_SHADER, VERT));
+  gl.attachShader(pr, compile(gl.FRAGMENT_SHADER, fsrc));
+  gl.bindAttribLocation(pr, 0, "a");
+  gl.linkProgram(pr);
+  if(!gl.getProgramParameter(pr, gl.LINK_STATUS))
+    throw new Error(gl.getProgramInfoLog(pr));
+  return pr;
+}
+
+const progSeed = program(FRAG_SEED);
+const progFb   = program(FRAG_FEEDBACK);
+const progDisp = program(FRAG_DISPLAY);
+
+const quad = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+gl.enableVertexAttribArray(0);
+gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+function uni(pr, name){ return gl.getUniformLocation(pr, name); }
+const U = {
+  seed:{ time:uni(progSeed,"uTime"), aspect:uni(progSeed,"uAspect") },
+  fb:{},
+  disp:{ tex:uni(progDisp,"uTex"), px:uni(progDisp,"uPx"), bloom:uni(progDisp,"uBloom"), scan:uni(progDisp,"uScan"), lines:uni(progDisp,"uLines") }
+};
+["uPrev","uDelay","uCustom","uCenter","uPx","uTime","uAspect","uZoom","uRot","uWarp","uPan",
+ "uBright","uContrast","uSat","uHue","uGain","uSharp","uBleed","uDelayMix","uEdge","uKaleido",
+ "uMirrorX","uInvert","uSeedShape","uHasCustom","uSeedAmt","uSeedSize","uSeedPos"]
+  .forEach(n => U.fb[n] = uni(progFb, n));
+
+/* ---------- ring of framebuffers (ping-pong + delay history) ---------- */
+const RING = 16;
+let ring = [];
+let W = 0, H = 0, head = 0;
+
+/* Stand-in for the custom-shape sampler while nothing has been uploaded.
+   It must not be a ring texture: sampling the framebuffer we are drawing
+   into is a feedback loop, and that draw comes back as garbage. */
+const emptyTex = gl.createTexture();
+gl.bindTexture(gl.TEXTURE_2D, emptyTex);
+gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+              new Uint8Array([0,0,0,0]));
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+function makeTarget(w, h){
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  const fbo = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  return {tex, fbo};
+}
+
+function allocate(){
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  let w = Math.max(2, Math.round(window.innerWidth  * dpr * P.res));
+  let h = Math.max(2, Math.round(window.innerHeight * dpr * P.res));
+  const cap = 1280;
+  const m = Math.max(w, h);
+  if(m > cap){ w = Math.round(w * cap/m); h = Math.round(h * cap/m); }
+  if(w === W && h === H) return;
+  W = w; H = h;
+  cvs.width = w; cvs.height = h;
+  ring.forEach(t => { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fbo); });
+  ring = [];
+  for(let i=0;i<RING;i++) ring.push(makeTarget(w, h));
+  head = 0;
+  seedAll();
+}
+
+/* ---------- state ---------- */
+let playing = true;
+let gen = 0;
+const center = {x:0.5, y:0.5};      // vanishing point, fixed at frame centre
+const seedPos = {x:0.5, y:0.5};     // where the seed lands this frame
+const seedAnchor = {x:0.5, y:0.5};  // where the user put it
+let pulse = 0;                      // decaying one shot
+let drawHold = 0;                   // sustained while the right button is down
+let customTex = null, hasCustom = 0;
+const startT = performance.now();
+
+function drawQuad(){ gl.drawArrays(gl.TRIANGLES, 0, 3); }
+
+function seedInto(idx){
+  gl.useProgram(progSeed);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, ring[idx].fbo);
+  gl.viewport(0, 0, W, H);
+  gl.uniform1f(U.seed.time, (performance.now()-startT)/1000);
+  gl.uniform1f(U.seed.aspect, W/H);
+  drawQuad();
+}
+function seedAll(){
+  /* Drop any ring textures still bound from the last step. Seeding draws into
+     those same framebuffers, and leaving them bound reads as a feedback loop. */
+  for(let u = 0; u < 3; u++){
+    gl.activeTexture(gl.TEXTURE0 + u);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+  }
+  for(let i=0;i<RING;i++) seedInto(i);
+  gen = 0;
+}
+
+/* ---------- feedback step ---------- */
+function step(t){
+  const prevIdx  = (head + RING - 1) % RING;
+  const dF = Math.min(P.delayFrames|0, RING - 2);
+  const delayIdx = (head + RING - 1 - dF) % RING;
+
+  gl.useProgram(progFb);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, ring[head].fbo);
+  gl.viewport(0, 0, W, H);
+
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, ring[prevIdx].tex);
+  gl.uniform1i(U.fb.uPrev, 0);
+  gl.activeTexture(gl.TEXTURE1);
+  gl.bindTexture(gl.TEXTURE_2D, ring[delayIdx].tex);
+  gl.uniform1i(U.fb.uDelay, 1);
+  gl.activeTexture(gl.TEXTURE2);
+  gl.bindTexture(gl.TEXTURE_2D, customTex || emptyTex);
+  gl.uniform1i(U.fb.uCustom, 2);
+
+  /* The seed stays where it was placed. Seed motion orbits it from there,
+     so at zero drift it does not move at all. */
+  const d = P.seedDrift;
+  seedPos.x = seedAnchor.x + Math.sin(t*0.7) * 0.30 * d;
+  seedPos.y = seedAnchor.y + Math.cos(t*0.53) * 0.30 * d;
+
+  gl.uniform2f(U.fb.uCenter, center.x, 1.0 - center.y);
+  gl.uniform2f(U.fb.uPx, 1/W, 1/H);
+  gl.uniform1f(U.fb.uTime, t);
+  gl.uniform1f(U.fb.uAspect, W/H);
+  gl.uniform1f(U.fb.uZoom, P.zoom);
+  gl.uniform1f(U.fb.uRot, P.rot * Math.PI/180);
+  gl.uniform1f(U.fb.uWarp, P.warp);
+  gl.uniform2f(U.fb.uPan, P.panX, -P.panY);
+  gl.uniform1f(U.fb.uBright, P.bright);
+  gl.uniform1f(U.fb.uContrast, P.contrast);
+  gl.uniform1f(U.fb.uSat, P.sat);
+  gl.uniform1f(U.fb.uHue, P.hue * Math.PI/180);
+  gl.uniform1f(U.fb.uGain, P.decay);
+  gl.uniform1f(U.fb.uSharp, P.sharp);
+  gl.uniform1f(U.fb.uBleed, P.bleed);
+  gl.uniform1f(U.fb.uDelayMix, dF > 0 ? P.delayMix : 0.0);
+  gl.uniform1i(U.fb.uEdge, P.edge|0);
+  gl.uniform1i(U.fb.uKaleido, P.kaleido|0);
+  gl.uniform1i(U.fb.uMirrorX, P.mirrorX|0);
+  gl.uniform1i(U.fb.uInvert, P.invert|0);
+  gl.uniform1i(U.fb.uSeedShape, P.seedShape|0);
+  gl.uniform1i(U.fb.uHasCustom, hasCustom);
+  gl.uniform1f(U.fb.uSeedAmt, P.seedAmt + pulse + drawHold);
+  gl.uniform1f(U.fb.uSeedSize, P.seedSize);
+  gl.uniform2f(U.fb.uSeedPos, seedPos.x, 1.0 - seedPos.y);
+
+  drawQuad();
+
+  head = (head + 1) % RING;
+  gen++;
+  pulse *= 0.80;
+}
+
+function present(){
+  const outIdx = (head + RING - 1) % RING;
+  gl.useProgram(progDisp);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.viewport(0, 0, cvs.width, cvs.height);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, ring[outIdx].tex);
+  gl.uniform1i(U.disp.tex, 0);
+  gl.uniform2f(U.disp.px, 1/W, 1/H);
+  gl.uniform1f(U.disp.bloom, P.bloom);
+  gl.uniform1f(U.disp.scan, P.scan);
+  gl.uniform1f(U.disp.lines, H);
+  drawQuad();
+}
+
+/* ---------- main loop ---------- */
+/* The real rig runs at video rate, so the loop is pinned to 60 Hz —
+   otherwise a 144 Hz display would burn through generations 2.4x faster. */
+const STEP_MS = 1000/60;
+let last = performance.now(), acc = 0;
+function frame(now){
+  requestAnimationFrame(frame);
+  const dt = Math.min(now - last, 250); last = now;
+  const t = (now - startT) / 1000;
+  if(playing){
+    acc += dt;
+    let guard = 0;
+    while(acc >= STEP_MS && guard < 4){
+      for(let i = 0, n = P.iters|0; i < n; i++) step(t);
+      acc -= STEP_MS; guard++;
+    }
+    if(acc > STEP_MS*4) acc = 0;
+  }
+  present();
+}
+
+/* ------------------------------------------------------------------ */
+/*  Console definition                                                 */
+/*  Columns are the groups, top-to-bottom then left-to-right.          */
+/* ------------------------------------------------------------------ */
+const f3 = v => v.toFixed(3);
+const f2 = v => v.toFixed(2);
+const trim  = v => { const d = (v-1)*1000; return (d>=0?"+":"") + d.toFixed(1) + "‰"; };
+const per1k = v => { const d = v*1000;     return (d>=0?"+":"") + d.toFixed(1) + "‰"; };
+
+const GROUPS = [
+  { id:"controls", name:"Controls", accent:"#c9ced6", items:[
+    {t:"btn", act:"play",   icon:"play.png",   label:"Play"},
+    {t:"btn", act:"reset",  icon:"reset.png",  label:"Reset"},
+    {t:"btn", act:"inject", icon:"inject.png", label:"Inject"},
+    {t:"btn", act:"random", icon:"dice.png",   label:"Random"},
+    {t:"btn", act:"upload", icon:"upload.png", label:"Upload shape"}
+  ]},
+  { id:"camera", name:"Camera", accent:"#4a50e8", items:[
+    {t:"hdr", icon:"camera.png", label:"Camera"},
+    {t:"knob", k:"zoom", label:"Zoom",      min:0.960, max:1.040, step:0.001, fmt:f3},
+    {t:"knob", k:"rot",  label:"Rotation",  min:-6, max:6, step:0.05, fmt:v=>f2(v)+"°"},
+    {t:"knob", k:"panX", label:"Pan X",     min:-0.06, max:0.06, step:0.001, fmt:f3},
+    {t:"knob", k:"panY", label:"Pan Y",     min:-0.06, max:0.06, step:0.001, fmt:f3},
+    {t:"knob", k:"warp", label:"Lens warp", min:-0.6, max:0.6, step:0.01, fmt:f2}
+  ]},
+  { id:"signal", name:"Signal", accent:"#dda50e", items:[
+    {t:"hdr", icon:"signal.png", label:"Signal"},
+    {t:"knob", k:"bright",   label:"Brightness", min:-0.004, max:0.004, step:0.00005, fmt:per1k},
+    {t:"knob", k:"contrast", label:"Contrast",   min:0.996, max:1.004, step:0.0001, fmt:trim},
+    {t:"knob", k:"sharp",    label:"Sharpness",  min:0, max:1, step:0.01, fmt:f2},
+    {t:"knob", k:"sat",      label:"Colour",     min:0.994, max:1.006, step:0.0001, fmt:trim},
+    {t:"knob", k:"hue",      label:"Hue shift",  min:-6, max:6, step:0.05, fmt:v=>(v>0?"+":"")+f2(v)+"°"},
+    {t:"knob", k:"decay",    label:"Gain",       min:0.990, max:1.004, step:0.0001, fmt:trim}
+  ]},
+  { id:"feedback", name:"Feedback", accent:"#e0342b", items:[
+    {t:"hdr", icon:"feedback.png", label:"Feedback"},
+    {t:"knob", k:"bleed",       label:"Chroma bleed", min:0, max:0.014, step:0.0002, fmt:v=>v.toFixed(4)},
+    {t:"knob", k:"delayFrames", label:"Delay",        min:0, max:14, step:1, fmt:v=>v+" f"},
+    {t:"knob", k:"delayMix",    label:"Delay blend",  min:0, max:0.9, step:0.01, fmt:f2},
+    {t:"sel",  k:"edge",        label:"Edge behaviour", options:EDGES},
+    {t:"knob", k:"kaleido",     label:"Kaleidoscope", min:0, max:12, step:1, fmt:v=>v===0?"off":v+"×"}
+  ]},
+  { id:"seed", name:"Seed", accent:"#1fc748", items:[
+    {t:"hdr", icon:"seed.png", label:"Seed"},
+    {t:"knob", k:"seedAmt",   label:"Injection",      min:0, max:1, step:0.005, fmt:f2},
+    {t:"knob", k:"seedSize",  label:"Injection size", min:0.005, max:0.30, step:0.001, fmt:f3},
+    {t:"knob", k:"seedDrift", label:"Seed motion",    min:0, max:1, step:0.01, fmt:f2},
+    {t:"sel",  k:"seedShape", label:"Injected shape", options:SHAPES}
+  ]},
+  { id:"display", name:"Display", accent:"#a72fdd", items:[
+    {t:"hdr", icon:"display.png", label:"Display", act:"fullscreen", aria:"Toggle fullscreen"},
+    {t:"knob", k:"bloom", label:"Bloom",         min:0, max:1, step:0.01, fmt:f2},
+    {t:"knob", k:"scan",  label:"Scanlines",     min:0, max:1, step:0.01, fmt:f2},
+    {t:"knob", k:"iters", label:"Loops / frame", min:1, max:3, step:1, fmt:v=>v+"×"},
+    {t:"knob", k:"res",   label:"Resolution",    min:0.4, max:1.0, step:0.05, fmt:v=>Math.round(v*100)+"%"}
+  ]}
+];
+
+/* ------------------------------------------------------------------ */
+/*  Console build                                                      */
+/* ------------------------------------------------------------------ */
+const consoleEl = document.getElementById("console");
+const cells = [];               // every interactive control
+let selected = null;            // cell object, or null
+let hovered  = null;
+let dragCount = 0;              // knobs mid-adjustment; holds the hud open
+
+const SWEEP = 270;              // -135deg .. +135deg
+
+function angleFor(c){
+  let t;
+  if(c.def.t === "sel"){
+    const n = optionsOf(c).length;
+    t = n > 1 ? P[c.def.k] / (n - 1) : 0.5;
+  } else {
+    const d = c.def;
+    t = (P[d.k] - d.min) / (d.max - d.min);
+  }
+  return -SWEEP/2 + Math.max(0, Math.min(1, t)) * SWEEP;
+}
+function optionsOf(c){
+  const o = c.def.options;
+  return (c.def.k === "seedShape" && hasCustom) ? o.concat(["custom"]) : o;
+}
+
+function img(src, cls){
+  const e = document.createElement("img");
+  e.src = "/fractalcrack/assets/" + src;
+  e.alt = "";
+  if(cls) e.className = cls;
+  return e;
+}
+
+GROUPS.forEach(g => {
+  const col = document.createElement("div");
+  col.className = "col g-" + g.id;
+
+  g.items.forEach(def => {
+    /* a header is inert unless it carries an action of its own */
+    const inert = (def.t === "hdr" && !def.act);
+    const cell = document.createElement(inert ? "div" : "button");
+    cell.className = "cell" + (inert ? " hdr" : "");
+    if(!inert){ cell.type = "button"; }
+
+    const obj = {def, group:g, el:cell, hand:null};
+
+    if(def.t === "knob" || def.t === "sel"){
+      cell.appendChild(img("knob-base-red.png", "tint"));
+      const hand = img("knob-hand-red.png", "tint hand");
+      cell.appendChild(hand);
+      obj.hand = hand;
+      cell.setAttribute("aria-label", def.label);
+    } else {
+      cell.appendChild(img("blank-circle-red.png", "tint"));
+      const glyph = img(def.icon, "glyph");
+      cell.appendChild(glyph);
+      obj.glyph = glyph;
+      cell.setAttribute("aria-label", def.aria || def.label);
+      if(inert) cell.setAttribute("role", "img");
+    }
+
+    col.appendChild(cell);
+    cells.push(obj);
+    wire(obj);
+  });
+
+  consoleEl.appendChild(col);
+});
+
+function refreshKnobs(){
+  cells.forEach(c => {
+    if(c.hand) c.hand.style.transform = "rotate(" + angleFor(c).toFixed(2) + "deg)";
+  });
+  if(legendTarget()) drawLegend(legendTarget());
+}
+
+/* ------------------------------------------------------------------ */
+/*  Legend                                                             */
+/* ------------------------------------------------------------------ */
+const legend  = document.getElementById("legend");
+const lgGroup = document.getElementById("lgGroup");
+const lgTitle = document.getElementById("lgTitle");
+const lgValue = document.getElementById("lgValue");
+const lgOpts  = document.getElementById("lgOpts");
+const lgLock  = document.getElementById("lgLock");
+const lgClose = document.getElementById("lgClose");
+
+lgClose.addEventListener("click", e => { e.stopPropagation(); select(null); });
+
+function legendTarget(){ return hovered || selected; }
+
+function drawLegend(c){
+  legend.style.setProperty("--accent", c.group.accent);
+  lgGroup.textContent = c.def.t === "hdr" ? "Section" : c.group.name;
+  lgTitle.textContent = c.def.label;
+  lgOpts.textContent = "";
+
+  if(c.def.t === "knob"){
+    lgValue.textContent = c.def.fmt(P[c.def.k]);
+    lgValue.style.display = "";
+  } else if(c.def.t === "sel"){
+    lgValue.style.display = "none";
+    optionsOf(c).forEach((name, i) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = name;
+      b.setAttribute("aria-pressed", String(i === P[c.def.k]));
+      if(i === P[c.def.k]) b.className = "on";
+      b.addEventListener("click", ev => {
+        ev.stopPropagation();
+        setValue(c, i);
+        select(c);                    // stay locked so you can keep picking
+      });
+      lgOpts.appendChild(b);
+    });
+  } else {
+    /* buttons carry no value modifier */
+    lgValue.style.display = "none";
+  }
+  const locked = (selected === c);
+  lgLock.textContent = locked
+    ? (c.def.t === "sel" ? "locked — click an option" : "locked — drag to adjust")
+    : "";
+  lgClose.hidden = !locked;           // only offer it when there is a lock to release
+  legend.classList.add("show");
+}
+function hideLegend(){ legend.classList.remove("show"); lgClose.hidden = true; }
+
+function updateLegend(){
+  const t = legendTarget();
+  if(t) drawLegend(t); else hideLegend();
+}
+
+function select(c){
+  if(selected) selected.el.classList.remove("sel");
+  selected = c;
+  if(c) c.el.classList.add("sel");
+  updateLegend();
+}
+
+/* ------------------------------------------------------------------ */
+/*  Control wiring                                                     */
+/* ------------------------------------------------------------------ */
+function setValue(c, val){
+  const d = c.def;
+  if(d.t === "sel"){
+    const n = optionsOf(c).length;
+    P[d.k] = Math.max(0, Math.min(n-1, Math.round(val)));
+  } else {
+    let v = Math.max(d.min, Math.min(d.max, val));
+    v = Math.round(v / d.step) * d.step;
+    v = Math.max(d.min, Math.min(d.max, v));
+    P[d.k] = parseFloat(v.toPrecision(10));
+    if(d.k === "res") scheduleAlloc();
+  }
+  refreshKnobs();
+}
+
+function wire(c){
+  const el = c.el, d = c.def;
+
+  el.addEventListener("pointerenter", () => { hovered = c; updateLegend(); });
+  el.addEventListener("pointerleave", () => { if(hovered === c) hovered = null; updateLegend(); });
+
+  if(d.t === "hdr"){                     // section label: legend on hover
+    if(d.act) el.addEventListener("click", () => doAction(d.act, c));
+    return;
+  }
+
+  if(d.t === "btn"){
+    el.addEventListener("click", () => doAction(d.act, c));
+    return;
+  }
+
+  /* knob / selector: vertical drag, click to lock, double-click to default */
+  let dragging = false, startY = 0, startVal = 0, moved = 0;
+
+  el.addEventListener("pointerdown", e => {
+    dragging = true; moved = 0;
+    startY = e.clientY;
+    startVal = P[d.k];
+    dragCount++; wake();                // hold the hud open while adjusting
+    el.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+
+  el.addEventListener("pointermove", e => {
+    if(!dragging) return;
+    const dy = startY - e.clientY;
+    moved = Math.max(moved, Math.abs(dy));
+    const fine = e.shiftKey ? 0.2 : 1;
+    if(d.t === "sel"){
+      const n = optionsOf(c).length;
+      setValue(c, startVal + (dy / 150) * (n - 1) * fine);
+    } else {
+      setValue(c, startVal + (dy / 190) * (d.max - d.min) * fine);
+    }
+  });
+
+  const end = e => {
+    if(!dragging) return;
+    dragging = false;
+    dragCount = Math.max(0, dragCount - 1);
+    wake();                             // restart the idle countdown
+    try{ el.releasePointerCapture(e.pointerId); }catch(_){}
+  };
+  el.addEventListener("pointerup", end);
+  el.addEventListener("pointercancel", end);
+
+  el.addEventListener("click", e => {
+    if(moved > 3) return;                 // that was a drag, not a click
+    select(selected === c ? null : c);
+  });
+
+  el.addEventListener("dblclick", e => {
+    e.preventDefault();
+    setValue(c, DEFAULTS[d.k]);
+    select(c);                            // stays selected after a reset
+  });
+
+  el.addEventListener("wheel", e => {
+    if(selected !== c && hovered !== c) return;
+    e.preventDefault();
+    const dir = e.deltaY < 0 ? 1 : -1;
+    if(d.t === "sel") setValue(c, P[d.k] + dir);
+    else setValue(c, P[d.k] + dir * d.step * (e.shiftKey ? 1 : 5));
+  }, {passive:false});
+
+  el.addEventListener("keydown", e => {
+    let dir = 0;
+    if(e.key === "ArrowUp" || e.key === "ArrowRight") dir = 1;
+    else if(e.key === "ArrowDown" || e.key === "ArrowLeft") dir = -1;
+    else return;
+    e.preventDefault();
+    if(d.t === "sel") setValue(c, P[d.k] + dir);
+    else setValue(c, P[d.k] + dir * d.step * (e.shiftKey ? 1 : 5));
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/*  Actions                                                            */
+/* ------------------------------------------------------------------ */
+const fileIn = document.getElementById("fileIn");
+let playGlyph = null;
+cells.forEach(c => { if(c.def.act === "play") playGlyph = c.glyph; });
+
+function setPlaying(v){
+  playing = v;
+  if(playGlyph) playGlyph.src = "/fractalcrack/assets/" + (v ? "pause.png" : "play.png");
+}
+
+/* Drop an uploaded shape and fall back to a built-in one. Deliberately not
+   inside seedAll(), which also runs on resize — that must not bin the upload. */
+function clearCustom(){
+  if(!hasCustom) return;
+  hasCustom = 0;
+  if(customTex){ gl.deleteTexture(customTex); customTex = null; }
+  if(P.seedShape === CUSTOM_INDEX) P.seedShape = DEFAULTS.seedShape;
+  refreshKnobs();
+}
+
+function doAction(act, c){
+  if(act === "play")   setPlaying(!playing);
+  else if(act === "reset"){ clearCustom(); seedAll(); }
+  else if(act === "inject") pulse = 0.5;
+  else if(act === "random") randomize();
+  else if(act === "upload") fileIn.click();
+  else if(act === "fullscreen") toggleFullscreen();
+}
+
+function toggleFullscreen(){
+  const root = document.documentElement;
+  if(!document.fullscreenElement){
+    if(root.requestFullscreen) root.requestFullscreen();
+  } else if(document.exitFullscreen){
+    document.exitFullscreen();
+  }
+}
+
+function randomize(){
+  const rr = (a, b) => a + Math.random()*(b - a);
+  clearCustom();
+  const outward = Math.random() < 0.65;
+  P.zoom = outward ? rr(1.003, 1.020) : rr(0.978, 0.996);
+  P.edge = outward ? (Math.random() < 0.7 ? 3 : 1) : (Math.random() < 0.7 ? 0 : 2);
+  P.rot = rr(-4, 4);
+  P.panX = rr(-0.02, 0.02);
+  P.panY = rr(-0.02, 0.02);
+  P.warp = rr(-0.2, 0.2);
+  P.contrast = rr(0.9995, 1.0030);
+  P.sharp = rr(0.15, 0.65);
+  P.sat = rr(0.9990, 1.0040);
+  P.hue = rr(-4, 4);
+  P.decay = rr(0.9975, 1.0008);
+  P.bright = rr(-0.0006, 0.0006);
+  P.bleed = rr(0.001, 0.010);
+  P.delayFrames = Math.random() < 0.5 ? 0 : Math.floor(rr(2, 13));
+  P.delayMix = rr(0.15, 0.55);
+  P.kaleido = Math.random() < 0.6 ? 0 : Math.floor(rr(2, 12));
+  P.seedShape = 1 + Math.floor(Math.random()*4);
+  P.seedAmt = rr(0.10, 0.45);
+  P.seedSize = rr(0.02, 0.12);
+  /* Seed motion is left alone on purpose: randomising it sets the injection
+     wandering, and where it sits is the user's call, not the dice. */
+  refreshKnobs();
+}
+
+/* uploaded png becomes an injectable shape */
+fileIn.addEventListener("change", () => {
+  const f = fileIn.files && fileIn.files[0];
+  if(!f) return;
+  const url = URL.createObjectURL(f);
+  const im = new Image();
+  im.onload = () => {
+    if(!customTex) customTex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, customTex);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, im);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    hasCustom = 1;
+    P.seedShape = CUSTOM_INDEX;          // custom appears and is selected
+    URL.revokeObjectURL(url);
+    refreshKnobs();
+  };
+  im.onerror = () => URL.revokeObjectURL(url);
+  im.src = url;
+  fileIn.value = "";
+});
+
+/* ------------------------------------------------------------------ */
+/*  Canvas pointer                                                     */
+/*  left held    — move the injection                                  */
+/*  right click  — put the injection here and fire it                  */
+/*  right dragged— keep firing along the path, drawing with it         */
+/*  double click — send the injection back to the centre               */
+/*  The two buttons are tracked separately so a right click still      */
+/*  fires while the left button is being held.                         */
+/* ------------------------------------------------------------------ */
+let leftDown = false, rightDown = false;
+const anyDown = () => leftDown || rightDown;
+
+function placeSeed(e){
+  seedAnchor.x = Math.min(1, Math.max(0, e.clientX / window.innerWidth));
+  seedAnchor.y = Math.min(1, Math.max(0, e.clientY / window.innerHeight));
+}
+function duckHud(){
+  hud.classList.add("idle");        // out of the way while working on the canvas
+  clearTimeout(idleTimer);
+}
+cvs.addEventListener("contextmenu", e => e.preventDefault());
+
+cvs.addEventListener("pointerdown", e => {
+  try{ cvs.setPointerCapture(e.pointerId); }catch(_){}
+  if(e.button === 2){
+    rightDown = true;
+    placeSeed(e);                   // lands wherever the right click hits
+    pulse = 0.35;                   // visible even for an instant click
+    drawHold = 0.5;                 // held down, so a drag keeps drawing
+    duckHud();
+    return;
+  }
+  if(e.button !== 0) return;
+  leftDown = true;
+  placeSeed(e);
+  duckHud();
+});
+
+cvs.addEventListener("pointermove", e => { if(anyDown()) placeSeed(e); });
+
+cvs.addEventListener("pointerup", e => {
+  if(e.button === 2){ rightDown = false; drawHold = 0; }
+  else if(e.button === 0){ leftDown = false; }
+  if(anyDown()) return;             // the other button is still down
+  try{ cvs.releasePointerCapture(e.pointerId); }catch(_){}
+  wake();                           // released: bring the hud back
+});
+cvs.addEventListener("pointercancel", () => {
+  leftDown = rightDown = false; drawHold = 0; wake();
+});
+
+cvs.addEventListener("dblclick", () => { seedAnchor.x = 0.5; seedAnchor.y = 0.5; });
+
+/* ------------------------------------------------------------------ */
+/*  Idle auto-hide                                                     */
+/* ------------------------------------------------------------------ */
+const hud = document.getElementById("hud");
+let idleTimer = null;
+/* The hud hides after two idle seconds whatever is selected. The one thing
+   that holds it open is an adjustment actually in progress. */
+const IDLE_MS = 2000;
+function wake(){
+  if(anyDown()){ hud.classList.add("idle"); return; } // stays hidden until release
+  hud.classList.remove("idle");
+  clearTimeout(idleTimer);
+  if(dragCount > 0) return;
+  idleTimer = setTimeout(() => hud.classList.add("idle"), IDLE_MS);
+}
+["pointermove","pointerdown","wheel","keydown","touchstart"].forEach(ev =>
+  window.addEventListener(ev, wake, {passive:true}));
+wake();
+
+/* ------------------------------------------------------------------ */
+/*  Keys & resize                                                      */
+/* ------------------------------------------------------------------ */
+window.addEventListener("keydown", e => {
+  if(e.target !== document.body) return;
+  if(e.code === "Space"){ e.preventDefault(); setPlaying(!playing); }
+  else if(e.key === "r" || e.key === "R") doAction("reset");
+  else if(e.key === "Escape") select(null);
+});
+
+let allocTimer = null;
+function scheduleAlloc(){ clearTimeout(allocTimer); allocTimer = setTimeout(allocate, 120); }
+window.addEventListener("resize", scheduleAlloc);
+
+/* ------------------------------------------------------------------ */
+/*  Boot                                                               */
+/* ------------------------------------------------------------------ */
+const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+allocate();
+refreshKnobs();
+setPlaying(!reduce);
+requestAnimationFrame(frame);
+
+})();
+</script>
+</body>
+</html>
