@@ -12,7 +12,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Fractal Crack</title>
 <!-- The route plugin (vite.config.js) leaves an app-program's own html alone —
      no seo:start/end markers here, unlike the site shell — so this head is
@@ -44,8 +44,8 @@
   --gap: calc(var(--cell) * 0.13);
   --hud-fade: .45s ease;
 }
-*{box-sizing:border-box}
-html,body{height:100%}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+html,body{height:100%; overscroll-behavior:none}
 body{
   margin:0;
   background:#000;
@@ -60,6 +60,7 @@ body{
   width:100%; height:100%;
   display:block;
   z-index:0;
+  touch-action:none;       /* the app owns pan/zoom on the canvas, not the browser */
 }
 
 /* ---------- hud shell ---------- */
@@ -74,6 +75,14 @@ body{
 .hud > *{pointer-events:auto}
 /* faded out means gone — an invisible console must not eat canvas clicks */
 .hud.idle, .hud.idle *{pointer-events:none}
+
+/* ---------- top bar (logo + console) ---------- */
+/* display:contents by default — this wrapper has no box of its own here, so
+   #logo and #console position themselves exactly as if they were still
+   direct children of .hud (which is what they were before this wrapper
+   existed). Only the portrait media query below turns it into a real flex
+   row, to vertically centre the two against each other. */
+#topBar{ display:contents }
 
 /* ---------- logo ---------- */
 #logo{
@@ -97,16 +106,28 @@ body{
   display:flex; flex-direction:column;
   gap:var(--gap);
 }
+/* wraps every group EXCEPT controls (that's #controlsBar itself, a .col) —
+   same flex row the columns sat in directly before this wrapper existed, so
+   desktop/landscape looks identical; only the portrait media query below
+   turns this into the slide-up knob sheet. */
+#knobPanel{
+  display:flex;
+  gap:var(--gap);
+}
 
 .cell{
   position:relative;
   width:var(--cell); height:var(--cell);
+  flex-shrink:0;            /* a circle must never get squeezed into an oval
+                                by a flex row that's short on space — the
+                                mobile controls/knob rows both scroll instead */
   display:block;
   border:0; padding:0; margin:0;
   background:transparent;
   cursor:pointer;
   border-radius:50%;
   filter:drop-shadow(0 2px 8px rgba(0,0,0,.65));
+  touch-action:none;       /* a knob's own drag must not scroll an ancestor */
 }
 .cell.hdr{cursor:default}
 .cell img{
@@ -176,46 +197,72 @@ body{
   width:20px; height:20px;
   display:grid; place-items:center;
   padding:0; border-radius:5px;
-  border:1px solid rgba(255,255,255,.14);
+  border:1px solid rgba(0,0,0,.14);
   background:transparent;
-  color:#8b93a1;
+  color:#6b7280;
   font-family:inherit; font-size:14px; line-height:1;
   cursor:pointer;
   transition:color .12s, border-color .12s, background .12s;
 }
-#lgClose:hover{
-  color:#fff;
-  border-color:var(--accent,#fff);
-  background:rgba(255,255,255,.09);
+@media (hover:hover) and (pointer:fine){
+  #lgClose:hover{
+    color:#000;
+    border-color:var(--accent,#000);
+    background:rgba(0,0,0,.06);
+  }
 }
 #lgClose[hidden]{display:none}
 #legend .lg-value{
   margin-top:7px;
   font-size:21px; font-weight:500;
-  color:var(--accent,#fff);
+  color:var(--accent,#000);
   font-variant-numeric:tabular-nums;
+}
+#legend .lg-value.editable{
+  cursor:pointer;
+  border-bottom:1px dashed var(--accent,#000);
+  width:fit-content;
+}
+#legend .lg-value-edit{
+  display:block;
+  margin:7px 0 0;
+  width:100%;
+  font-family:inherit;
+  font-size:21px; font-weight:500;
+  color:var(--accent,#000);
+  font-variant-numeric:tabular-nums;
+  background:rgba(0,0,0,.05);
+  border:0; border-bottom:1px solid var(--accent,#000);
+  border-radius:2px;
+  padding:0 2px;
+  outline:none;
 }
 #legend .lg-opts{
   margin-top:8px; display:flex; flex-wrap:wrap; gap:4px;
 }
+/* Unselected/selected read against #legend's WHITE fill (see above) — the
+   selected pill fills with the group's own accent colour rather than white,
+   so its label (kept white-on-accent) is never white-on-white. */
 #legend .lg-opts button{
   font-family:inherit;
   font-size:10px; letter-spacing:.05em; text-transform:uppercase;
   padding:4px 8px; border-radius:4px;
-  border:1px solid rgba(255,255,255,.16);
+  border:1px solid rgba(0,0,0,.18);
   background:transparent;
-  color:#8b93a1;
+  color:#4a5160;
   cursor:pointer;
   transition:border-color .12s, color .12s, background .12s;
 }
-#legend .lg-opts button:hover{
-  border-color:var(--accent,#fff);
-  color:#e8ecf2;
+@media (hover:hover) and (pointer:fine){
+  #legend .lg-opts button:hover{
+    border-color:var(--accent,#000);
+    color:#1a1d24;
+  }
 }
 #legend .lg-opts button.on{
-  border-color:var(--accent,#fff);
+  border-color:var(--accent,#333);
   color:#fff;
-  background:rgba(255,255,255,.09);
+  background:var(--accent,#333);
 }
 #legend .lg-lock{
   margin-top:8px; font-size:9.5px; letter-spacing:.16em;
@@ -227,8 +274,135 @@ body{
   padding:40px; text-align:center; color:#8b93a1; z-index:20;
 }
 
+/* ---------- mobile portrait ----------
+   Landscape (including landscape phones/tablets) is untouched — everything
+   below is scoped to portrait so "when horizontal, maintain the current hud"
+   holds exactly. Layout, not behaviour: the same GROUPS/cells/knobs render
+   here, just reflowed — Controls (play/reset/inject/random/upload) stays a
+   permanent top-right strip, and Camera/Signal/Feedback/Seed/Display move
+   into a slide-up sheet toggled by tapping the logo, so the fractal itself
+   keeps most of a narrow screen by default. */
+@media (max-width:900px) and (orientation:portrait){
+  /* #topBar becomes a real flex row here (it's display:contents everywhere
+     else — see the base rule) spanning the same left:20px/right:18px inset
+     the two used to carry independently, so logo and console still start
+     and end in the same places. align-items:center is the actual point of
+     this: #logo and #console are wildly different heights (the logo scales
+     with its own aspect ratio; the controls block is just its own two rows
+     of icons), so lining up their TOPS the way independent absolute
+     positioning did left them visually unbalanced. Centering them against
+     each other reads as one coherent row instead. */
+  #topBar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    position:absolute;
+    top:16px; left:20px; right:18px;
+  }
+  /* Both boxes are "half the screen width" — #logo trimmed by half a 12px
+     gap so it doesn't butt straight up against #console once both are
+     flex items sharing #topBar's width instead of independently inset. */
+  #logo{
+    position:static;
+    width:calc(50vw - 25px);
+    min-width:0;
+    cursor:pointer;
+  }
+  /* No forced width here any more — #controlsBar is only 3 cells wide now
+     (see below), so #console just shrink-wraps around it; #topBar's
+     justify-content:space-between keeps it flush against the right edge
+     instead of the right:18px it used to carry on its own. */
+  #console{
+    position:static;
+  }
+  /* Controls: two rows instead of a scrolling strip — 3 across the top,
+     Play + Reset on their own row underneath, both rows flush right. The
+     width is sized for exactly 3 cells (a 4th would still fit the half-
+     screen box from #logo, which would wrap it 4-and-1 instead); nth-child
+     reorders Play/Reset after Inject/Random/Upload without touching the
+     DOM, which is what the desktop column still reads top-to-bottom. */
+  #controlsBar{
+    --cell: 36px;
+    background:transparent;
+    flex-direction:row;
+    flex-wrap:wrap;
+    justify-content:flex-end;
+    width:calc(3 * var(--cell) + 2 * var(--gap) + 4px);
+  }
+  #controlsBar .cell:nth-child(1){ order:4 }   /* play  -> row 2 */
+  #controlsBar .cell:nth-child(2){ order:5 }   /* reset -> row 2 */
+  #controlsBar .cell:nth-child(3){ order:1 }   /* inject */
+  #controlsBar .cell:nth-child(4){ order:2 }   /* random */
+  #controlsBar .cell:nth-child(5){ order:3 }   /* upload */
+  /* Knobs: a bottom sheet, fixed to the viewport regardless of where it sits
+     in the DOM (no ancestor here has a transform, so position:fixed anchors
+     to the real viewport). Hidden below the fold by default; .knobs-open
+     (toggled by the logo, see the script) slides it up "in front of" the
+     bottom of the canvas rather than pushing anything. */
+  #knobPanel{
+    position:fixed; left:0; right:0; bottom:0; top:auto;
+    flex-direction:column;
+    align-items:stretch;
+    gap:14px;
+    margin:0;
+    padding:14px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+    max-height:62vh;
+    overflow-y:auto;
+    overflow-x:hidden;
+    -webkit-overflow-scrolling:touch;
+    touch-action:pan-y;
+    background:#fff;
+    border-top-left-radius:16px;
+    border-top-right-radius:16px;
+    box-shadow:0 -8px 28px rgba(0,0,0,.55);
+    transform:translateY(105%);
+    transition:transform .3s ease;
+    z-index:6;
+  }
+  .hud.knobs-open #knobPanel{ transform:translateY(0) }
+  /* Each group becomes its own horizontally-scrollable row: header icon
+     first (unchanged from desktop), its knobs trailing after it. */
+  #knobPanel .col{
+    flex-direction:row;
+    align-items:center;
+    width:100%;
+    overflow-x:auto;
+    overflow-y:hidden;
+    -webkit-overflow-scrolling:touch;
+    touch-action:pan-x;
+    padding-bottom:2px;
+  }
+  /* .cell::after / :focus-visible are a WHITE ring — right everywhere else
+     (dark canvas showing through), invisible against #knobPanel's white
+     fill. Cells living in the sheet get a dark ring instead; #controlsBar's
+     cells still sit over the canvas, so they're untouched. */
+  #knobPanel .cell::after{
+    border-color:#000;
+    box-shadow:0 0 8px rgba(0,0,0,.35);
+  }
+  #knobPanel .cell:focus-visible{ outline-color:#000 }
+  /* Legend stays vertically centred in the viewport at all times in portrait
+     — sheet open or closed — rather than pinned to its usual bottom-left
+     corner, so it's never reading a value through, or hidden under, the
+     sheet. z-index puts it above #knobPanel (6) for the case where centred
+     lands inside the sheet's own area while open. Width is clamped so it
+     can't run off a narrow screen the way a fixed 330px max-width can on a
+     small phone. */
+  #legend{
+    top:50%; bottom:auto; right:22px;
+    max-width:min(330px, calc(100vw - 44px));
+    z-index:7;
+    transition:opacity .14s, transform .14s;
+    transform:translateY(calc(-50% + 6px));
+  }
+  #legend.show{ transform:translateY(-50%) }
+}
+
 @media (prefers-reduced-motion:reduce){
   .hud,#legend,.cell::after{transition:none}
+}
+@media (prefers-reduced-motion:reduce) and (max-width:900px) and (orientation:portrait){
+  #knobPanel{transition:none}
 }
 </style>
 </head>
@@ -236,8 +410,13 @@ body{
 <canvas id="gl" aria-label="Video feedback fractal"></canvas>
 
 <div class="hud" id="hud">
-  <img id="logo" src="/fractalcrack/assets/fractalcrack-logo.png" alt="Fractal Crack">
-  <div id="console"></div>
+  <div id="topBar">
+    <img id="logo" src="/fractalcrack/assets/fractalcrack-logo.png" alt="Fractal Crack" tabindex="0" role="button" aria-expanded="false" aria-label="Toggle controls">
+    <div id="console">
+      <div id="controlsBar" class="col g-controls"></div>
+      <div id="knobPanel"></div>
+    </div>
+  </div>
   <div id="legend" role="status" aria-live="polite">
     <button id="lgClose" type="button" title="Deselect" aria-label="Deselect" hidden>&times;</button>
     <div class="lg-group" id="lgGroup"></div>
@@ -754,7 +933,8 @@ const GROUPS = [
 /* ------------------------------------------------------------------ */
 /*  Console build                                                      */
 /* ------------------------------------------------------------------ */
-const consoleEl = document.getElementById("console");
+const controlsBarEl = document.getElementById("controlsBar"); // the Controls group itself (it's a .col already, in the markup)
+const knobPanelEl = document.getElementById("knobPanel");     // everything else: Camera/Signal/Feedback/Seed/Display
 const cells = [];               // every interactive control
 let selected = null;            // cell object, or null
 let hovered  = null;
@@ -787,8 +967,12 @@ function img(src, cls){
 }
 
 GROUPS.forEach(g => {
-  const col = document.createElement("div");
-  col.className = "col g-" + g.id;
+  // Controls IS #controlsBar (see the markup) — everyone else gets a fresh
+  // .col appended into #knobPanel, same as every group used to get appended
+  // straight into #console.
+  const isControls = g.id === "controls";
+  const col = isControls ? controlsBarEl : document.createElement("div");
+  if(!isControls) col.className = "col g-" + g.id;
 
   g.items.forEach(def => {
     /* a header is inert unless it carries an action of its own */
@@ -819,7 +1003,7 @@ GROUPS.forEach(g => {
     wire(obj);
   });
 
-  consoleEl.appendChild(col);
+  if(!isControls) knobPanelEl.appendChild(col);
 });
 
 function refreshKnobs(){
@@ -842,17 +1026,43 @@ const lgClose = document.getElementById("lgClose");
 
 lgClose.addEventListener("click", e => { e.stopPropagation(); select(null); });
 
+/* Touch has no passive hover, so exploring the sheet by dragging a finger
+   around it shows nothing today — worse for the inert header icons, which
+   have no tap action of their own and are otherwise undiscoverable on
+   mobile. This previews whichever cell is currently under the finger, live,
+   the same way desktop's mouse hover already does via each cell's own
+   pointerenter/leave below. It never fires mid-knob-drag: that pointer is
+   captured to the knob itself (see wire()), so this listener simply never
+   sees its move events — only an uncaptured touch (started on a header, or
+   on empty space between cells) reaches it. Landing the tap ON a knob and
+   releasing there still locks it, same as a click always has: releasing an
+   uncaptured pointer over an element is what the browser bases its
+   synthesized click on. */
+knobPanelEl.addEventListener("pointermove", e => {
+  if(e.pointerType !== "touch") return;
+  const hit = document.elementFromPoint(e.clientX, e.clientY);
+  const cellEl = hit && hit.closest(".cell");
+  const c = cellEl ? cells.find(x => x.el === cellEl) : null;
+  if(c !== hovered){ hovered = c; updateLegend(); }
+}, {passive:true});
+knobPanelEl.addEventListener("pointerleave", () => {
+  if(hovered){ hovered = null; updateLegend(); }
+});
+
 function legendTarget(){ return hovered || selected; }
 
 function drawLegend(c){
+  if(editingCell && editingCell !== c) cancelEditValue(); // switched target mid-edit: discard, don't guess at a commit
   legend.style.setProperty("--accent", c.group.accent);
   lgGroup.textContent = c.def.t === "hdr" ? "Section" : c.group.name;
   lgTitle.textContent = c.def.label;
   lgOpts.textContent = "";
+  const locked = (selected === c);
 
   if(c.def.t === "knob"){
-    lgValue.textContent = c.def.fmt(P[c.def.k]);
+    if(editingCell !== c) lgValue.textContent = c.def.fmt(P[c.def.k]);
     lgValue.style.display = "";
+    lgValue.classList.toggle("editable", locked);
   } else if(c.def.t === "sel"){
     lgValue.style.display = "none";
     optionsOf(c).forEach((name, i) => {
@@ -872,14 +1082,15 @@ function drawLegend(c){
     /* buttons carry no value modifier */
     lgValue.style.display = "none";
   }
-  const locked = (selected === c);
   lgLock.textContent = locked
-    ? (c.def.t === "sel" ? "locked — click an option" : "locked — drag to adjust")
+    ? (c.def.t === "sel" ? "locked — click an option"
+       : c.def.t === "knob" ? "locked — drag, or tap the value to type one"
+       : "")
     : "";
   lgClose.hidden = !locked;           // only offer it when there is a lock to release
   legend.classList.add("show");
 }
-function hideLegend(){ legend.classList.remove("show"); lgClose.hidden = true; }
+function hideLegend(){ cancelEditValue(); legend.classList.remove("show"); lgClose.hidden = true; }
 
 function updateLegend(){
   const t = legendTarget();
@@ -892,6 +1103,59 @@ function select(c){
   if(c) c.el.classList.add("sel");
   updateLegend();
 }
+
+/* ------------------------------------------------------------------ */
+/*  Type an exact value — click/tap lg-value while a knob is locked.   */
+/*  Works identically on mouse and touch: a tap both focuses the input */
+/*  (bringing up the on-screen keyboard) and is a user gesture, which  */
+/*  is all focus()-to-open-keyboard needs on every mobile browser.     */
+/* ------------------------------------------------------------------ */
+let editingCell = null;
+const lgValueInput = document.createElement("input");
+lgValueInput.type = "text";
+lgValueInput.className = "lg-value lg-value-edit";
+lgValueInput.autocomplete = "off";
+lgValueInput.spellcheck = false;
+
+function cancelEditValue(){
+  if(!editingCell) return;
+  editingCell = null;
+  if(lgValueInput.isConnected) lgValueInput.replaceWith(lgValue);
+}
+function commitEditValue(){
+  if(!editingCell) return;
+  const c = editingCell;
+  const n = parseFloat(lgValueInput.value);
+  cancelEditValue();
+  if(!Number.isNaN(n)){
+    setValue(c, n);                 // already clamps to [min,max] and rounds to step
+    select(c);                      // stays locked, same as picking a sel option does
+  } else if(selected === c){
+    drawLegend(c);                  // bad input: put the real value back on screen
+  }
+}
+lgValueInput.addEventListener("keydown", e => {
+  e.stopPropagation();              // arrow keys etc. must not reach the knob underneath
+  if(e.key === "Enter"){ e.preventDefault(); lgValueInput.blur(); }
+  else if(e.key === "Escape"){ e.preventDefault(); cancelEditValue(); updateLegend(); }
+});
+lgValueInput.addEventListener("blur", commitEditValue);
+lgValueInput.addEventListener("pointerdown", e => e.stopPropagation());
+lgValueInput.addEventListener("click", e => e.stopPropagation());
+
+lgValue.addEventListener("click", e => {
+  const c = selected;
+  if(!c || c.def.t !== "knob") return;   // only a locked knob has a min/max to type into
+  e.stopPropagation();
+  editingCell = c;
+  lgValueInput.value = String(P[c.def.k]);
+  // iOS's decimal keypad has no minus key at all — anything with a negative
+  // range needs the full keyboard instead, or a negative value is unreachable.
+  lgValueInput.inputMode = c.def.min < 0 ? "text" : "decimal";
+  lgValue.replaceWith(lgValueInput);
+  lgValueInput.focus();
+  lgValueInput.select();
+});
 
 /* ------------------------------------------------------------------ */
 /*  Control wiring                                                     */
@@ -1138,6 +1402,36 @@ cvs.addEventListener("pointercancel", () => {
 
 cvs.addEventListener("dblclick", () => { seedAnchor.x = 0.5; seedAnchor.y = 0.5; });
 
+/* Touch has no right button, so a SECOND simultaneous touch stands in for it
+   — a common two-finger-for-secondary-action convention. Every touch already
+   drives the block above too (it reports button 0 same as a left click, so
+   one finger alone already moves the injection point); this only ADDS the
+   "fire + keep drawing" behaviour once a second finger joins, and clears it
+   as soon as the touch count drops back below two. Tracked independently of
+   leftDown/rightDown above so neither block has to know about the other. */
+const touchIds = new Set();
+cvs.addEventListener("pointerdown", e => {
+  if(e.pointerType !== "touch") return;
+  touchIds.add(e.pointerId);
+  if(touchIds.size === 2){
+    rightDown = true;
+    placeSeed(e);
+    pulse = 0.35;
+    drawHold = 0.5;
+    duckHud();
+  }
+});
+function releaseTouch(e){
+  if(e.pointerType !== "touch") return;
+  touchIds.delete(e.pointerId);
+  if(touchIds.size < 2){
+    rightDown = false; drawHold = 0;
+    if(!anyDown()) wake();
+  }
+}
+cvs.addEventListener("pointerup", releaseTouch);
+cvs.addEventListener("pointercancel", releaseTouch);
+
 /* ------------------------------------------------------------------ */
 /*  Idle auto-hide                                                     */
 /* ------------------------------------------------------------------ */
@@ -1156,6 +1450,24 @@ function wake(){
 ["pointermove","pointerdown","wheel","keydown","touchstart"].forEach(ev =>
   window.addEventListener(ev, wake, {passive:true}));
 wake();
+
+/* ------------------------------------------------------------------ */
+/*  Logo tap — mobile-portrait knob sheet toggle                       */
+/*  Inert on desktop/landscape: #knobPanel only becomes a slide-up      */
+/*  sheet under the portrait media query, so toggling this class there  */
+/*  has nothing to move. See the CSS for the actual sheet mechanics.    */
+/* ------------------------------------------------------------------ */
+const logo = document.getElementById("logo");
+function setKnobsOpen(open){
+  hud.classList.toggle("knobs-open", open);
+  logo.setAttribute("aria-expanded", String(open));
+}
+logo.addEventListener("click", () => setKnobsOpen(!hud.classList.contains("knobs-open")));
+logo.addEventListener("keydown", e => {
+  if(e.key !== "Enter" && e.key !== " ") return;
+  e.preventDefault();
+  setKnobsOpen(!hud.classList.contains("knobs-open"));
+});
 
 /* ------------------------------------------------------------------ */
 /*  Keys & resize                                                      */
