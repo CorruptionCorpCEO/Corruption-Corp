@@ -81,8 +81,22 @@
   to{ transform:rotate(360deg); }
 }
 :root{
-  --cell: clamp(42px, 4.1vw, 66px);
+  /* Desktop/landscape console sizing. --gap is derived, so it scales with the
+     cells rather than needing its own bump. The portrait media query pins its
+     own --cell on #knobPanel so the phone sheet keeps the size it was tuned
+     at — this larger value is for the roomier layout only.
+     The vh term matters: the console's tallest column is 7 cells (Signal),
+     so its height is what runs out first. Sizing on vw alone looks right on
+     a 16:9 monitor and overflows the bottom of a short, wide window. */
+  --cell: clamp(46px, min(5.4vw, 8.4vh), 88px);
   --gap: calc(var(--cell) * 0.13);
+  /* The console's own footprint, derived rather than measured so the legend
+     can be pinned to exactly the same width and stacked directly on top of
+     it (see the desktop placement block). 6 columns = Controls + the five
+     knob groups; 7 rows = the tallest of those columns, Signal's header plus
+     its six knobs. Keep both in step with GROUPS if a knob is ever added. */
+  --console-w: calc(6 * var(--cell) + 5 * var(--gap));
+  --console-h: calc(7 * var(--cell) + 6 * var(--gap));
   --hud-fade: .45s ease;
 }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
@@ -315,6 +329,34 @@ body{
   padding:40px; text-align:center; color:#8b93a1; z-index:20;
 }
 
+/* ---------- desktop placement ----------
+   Console in the bottom-right corner with the legend stacked directly above
+   it, both pinned to the same --console-w so they read as one panel. The
+   legend's `bottom` clears the console's own height rather than measuring
+   it, which is why --console-h exists.
+
+   The min-height is not decoration: this stacks two boxes that used to live
+   in opposite corners into one, so it needs roughly 500px of headroom. A
+   landscape PHONE matches (orientation:landscape) but has nowhere near that
+   — it keeps the base corner layout instead, which is also what "when
+   horizontal, maintain the current hud" asked for. Below this block's
+   threshold nothing overrides the base rules, so that fallback is automatic. */
+@media (min-width:901px) and (min-height:640px){
+  #console{
+    top:auto; bottom:18px;
+    width:var(--console-w);
+    /* still flex-start: the top row (play + the five group headers) is a
+       meaningful row of its own, and bottom-aligning would break it up. */
+  }
+  #legend{
+    left:auto; right:18px;
+    bottom:calc(18px + var(--console-h) + var(--gap));
+    width:var(--console-w);
+    min-width:0;
+    max-width:none;
+  }
+}
+
 /* ---------- mobile portrait ----------
    Landscape (including landscape phones/tablets) is untouched — everything
    below is scoped to portrait so "when horizontal, maintain the current hud"
@@ -381,6 +423,9 @@ body{
      (toggled by the logo, see the script) slides it up "in front of" the
      bottom of the canvas rather than pushing anything. */
   #knobPanel{
+    /* Pinned to what the sheet was tuned at — :root's --cell is the bigger
+       desktop/landscape size and would blow the rows out on a phone. */
+    --cell: 42px;
     position:fixed; left:0; right:0; bottom:0; top:auto;
     flex-direction:column;
     align-items:stretch;
@@ -1201,6 +1246,12 @@ lgValueInput.addEventListener("keydown", e => {
 lgValueInput.addEventListener("blur", commitEditValue);
 lgValueInput.addEventListener("pointerdown", e => e.stopPropagation());
 lgValueInput.addEventListener("click", e => e.stopPropagation());
+// Bookend the edit with the idle timer: focus clears any countdown already
+// scheduled (wake() won't set a new one while editingCell is set), and the
+// blur below runs AFTER commitEditValue has cleared editingCell, so it
+// starts the countdown again from the moment the box is done with.
+lgValueInput.addEventListener("focus", () => wake());
+lgValueInput.addEventListener("blur", () => wake());
 
 lgValue.addEventListener("click", e => {
   const c = selected;
@@ -1496,14 +1547,20 @@ cvs.addEventListener("pointercancel", releaseTouch);
 /* ------------------------------------------------------------------ */
 const hud = document.getElementById("hud");
 let idleTimer = null;
-/* The hud hides after two idle seconds whatever is selected. The one thing
-   that holds it open is an adjustment actually in progress. */
+/* The hud hides after two idle seconds whatever is selected. Two things hold
+   it open: an adjustment actually in progress, and a value being typed into
+   the legend. That second one matters on every platform — the legend lives
+   INSIDE .hud, so letting the countdown run mid-edit fades the very box being
+   typed into (and .hud.idle also kills pointer-events on it). On desktop it
+   took a two-second pause mid-number to hit; on mobile it fired almost every
+   time, because an on-screen keyboard generates no window keydown/pointer
+   events to keep resetting the timer. */
 const IDLE_MS = 2000;
 function wake(){
   if(anyDown()){ hud.classList.add("idle"); return; } // stays hidden until release
   hud.classList.remove("idle");
   clearTimeout(idleTimer);
-  if(dragCount > 0) return;
+  if(dragCount > 0 || editingCell) return;
   idleTimer = setTimeout(() => hud.classList.add("idle"), IDLE_MS);
 }
 ["pointermove","pointerdown","wheel","keydown","touchstart"].forEach(ev =>
