@@ -186,9 +186,26 @@ body{
 
    Plate colours are Pinballa's — black line art on a light plate — which is
    also the only readable option here: cclogo.png is black, and this app's
-   chrome is black. */
+   chrome is black.
+
+   WHERE it sits: the console's own bottom-right corner, in the block of empty
+   grid under the Seed and Display columns. Those two are five cells tall in a
+   box that is seven (Signal is the long one), so there is always a 2x2 hole of
+   cells there — 103px square at the smallest --cell this layout allows, which
+   is room to spare for an 83x55 plate. Derived from --console-h/--gap rather
+   than measured, for exactly the reason #legend is: no element can be
+   positioned against another element's box in CSS, and these are the numbers
+   the console is built from. Keep them in step with GROUPS.
+
+   It is also LAST inside #topBar, and both it and #console are positioned with
+   z-index auto — so DOM order is what paints it in front of the knob grid.
+   Moving it earlier in the markup would put it behind. */
 #ccExit{
-  position:absolute; top:18px; right:18px;
+  position:absolute;
+  /* Base layout: the console hangs from top:16px, so the hole is that far down
+     plus the console's height, less the plate's own. */
+  top:calc(16px + var(--console-h) - var(--cc-exit-h));
+  right:18px;
   width:var(--cc-exit-w); height:var(--cc-exit-h);
   display:flex; align-items:center; justify-content:center;
   padding:8px 10px;
@@ -236,11 +253,7 @@ body{
 
 /* ---------- console ---------- */
 #console{
-  position:absolute; top:16px;
-  /* The exit plate owns the corner; the console starts to the left of it.
-     Only in THIS layout — the desktop block below moves the console to the
-     bottom-right, where the corner is free again and it goes back to 18px. */
-  right:calc(18px + var(--cc-exit-w) + 12px);
+  position:absolute; top:16px; right:18px;
   display:flex;
   gap:var(--gap);
   align-items:flex-start;
@@ -484,10 +497,14 @@ body{
 @media (min-width:901px) and (min-height:640px){
   #console{
     top:auto; bottom:18px;
-    right:18px;              /* bottom corner: nothing to clear down here */
     width:var(--console-w);
     /* still flex-start: the top row (play + the five group headers) is a
        meaningful row of its own, and bottom-aligning would break it up. */
+  }
+  /* The console is bottom-anchored here, so its empty corner is simply the
+     screen's — same 18px inset, no derivation needed. */
+  #ccExit{
+    top:auto; bottom:18px; right:18px;
   }
   #legend{
     left:auto; right:18px;
