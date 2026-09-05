@@ -107,11 +107,13 @@
   --console-w: calc(6 * var(--cell) + 5 * var(--gap));
   --console-h: calc(7 * var(--cell) + 6 * var(--gap));
   --hud-fade: .45s ease;
-  /* The CC exit plate's own footprint, so #logo can clear it by name rather
-     than by a magic number that has to be re-derived every time the plate
-     changes size. The portrait bar below pins its own smaller pair. */
-  --cc-exit-w: 76px;
-  --cc-exit-h: 38px;
+  /* The CC exit plate's own footprint, so the console can clear it by name
+     rather than by a magic number that has to be re-derived every time the
+     plate changes size. The numbers are Pinballa's: its mark renders at 61x37
+     inside 8px/10px of padding and a 1px border, so this is the same control
+     at the same visible size, in a box that isn't stretched by a neighbour. */
+  --cc-exit-w: 83px;
+  --cc-exit-h: 55px;
 }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
 html,body{height:100%; overscroll-behavior:none}
@@ -186,10 +188,10 @@ body{
    also the only readable option here: cclogo.png is black, and this app's
    chrome is black. */
 #ccExit{
-  position:absolute; top:18px; left:20px;
+  position:absolute; top:18px; right:18px;
   width:var(--cc-exit-w); height:var(--cc-exit-h);
   display:flex; align-items:center; justify-content:center;
-  padding:5px 8px;
+  padding:8px 10px;
   border:1px solid rgba(0,0,0,.45);
   border-radius:8px;
   background:#f2f2f2;
@@ -203,7 +205,9 @@ body{
 }
 #ccExit:focus-visible{outline:2px solid #fff; outline-offset:3px}
 #ccExit img{
-  max-width:100%; max-height:100%;
+  /* cclogo.png is wide line art on transparent; 37px tall is what Pinballa
+     draws it at, so cap the height and let the aspect give the width. */
+  max-width:100%; max-height:37px;
   width:auto; height:auto;
   object-fit:contain;
   pointer-events:none;
@@ -213,7 +217,7 @@ body{
 #ccExit .cc-confirm{
   display:none;
   font-family:inherit;
-  font-size:13px; font-weight:600; letter-spacing:.06em;
+  font-size:15px; font-weight:700; letter-spacing:.06em;
   color:inherit;
 }
 #ccExit.confirming img{display:none}
@@ -221,7 +225,7 @@ body{
 
 /* ---------- logo ---------- */
 #logo{
-  position:absolute; top:18px; left:calc(20px + var(--cc-exit-w) + 12px);
+  position:absolute; top:18px; left:20px;
   width:25vw;               /* one quarter of the viewport */
   min-width:120px;
   height:auto;
@@ -232,7 +236,11 @@ body{
 
 /* ---------- console ---------- */
 #console{
-  position:absolute; top:16px; right:18px;
+  position:absolute; top:16px;
+  /* The exit plate owns the corner; the console starts to the left of it.
+     Only in THIS layout — the desktop block below moves the console to the
+     bottom-right, where the corner is free again and it goes back to 18px. */
+  right:calc(18px + var(--cc-exit-w) + 12px);
   display:flex;
   gap:var(--gap);
   align-items:flex-start;
@@ -311,7 +319,12 @@ body{
   border-left-width:3px;
   border-radius:8px;
   padding:11px 14px 12px;
-  backdrop-filter:blur(8px);
+  /* NO backdrop-filter. There was a blur(8px) here, behind an OPAQUE white
+     fill — invisible by construction, but the compositor still has to resolve
+     it, and its backdrop is a WebGL canvas that changes every single frame. So
+     it was a full-screen blur recomputed 60 times a second, for nothing, the
+     whole time the legend was on screen — which is exactly while you are
+     turning a knob and watching the result. */
   opacity:0;
   transform:translateY(6px);
   transition:opacity .14s, transform .14s;
@@ -471,6 +484,7 @@ body{
 @media (min-width:901px) and (min-height:640px){
   #console{
     top:auto; bottom:18px;
+    right:18px;              /* bottom corner: nothing to clear down here */
     width:var(--console-w);
     /* still flex-start: the top row (play + the five group headers) is a
        meaningful row of its own, and bottom-aligning would break it up. */
@@ -510,27 +524,29 @@ body{
     position:absolute;
     top:16px; left:20px; right:18px;
   }
-  /* The exit plate joins the row as a flex item instead of positioning itself,
-     and shrinks: a phone's top bar has to hold it, the logo AND the controls
-     block. It stays first, so it keeps the top-LEFT corner it has on desktop. */
+  /* The exit plate joins the row as a flex item instead of positioning itself.
+     It is LAST in the markup, so that puts it at the right-hand end — the same
+     corner it takes on every other viewport — and it keeps its full size,
+     because the whole point is that it reads as the same button Pinballa has.
+     The logo is what gives up width when three boxes won't fit (below). */
   #ccExit{
-    --cc-exit-w:52px;
-    --cc-exit-h:32px;
     position:static;
     flex:0 0 auto;
   }
-  #ccExit .cc-confirm{ font-size:11px }
   /* Both boxes are "half the screen width" — #logo trimmed by half a 12px
      gap so it doesn't butt straight up against #console once both are
      flex items sharing #topBar's width instead of independently inset. */
   #logo{
     position:static;
-    /* Was "half the screen less half the gap". The exit plate and its gap now
-       come out of the same half, so the three boxes still fit a 320px phone. */
+    /* Roughly half the screen, but SHRINKABLE — the controls block is a fixed
+       number of cells and the exit plate is a fixed size, so the logo is the
+       only one of the three that can give, and on a 320px phone it has to. */
+    flex:0 1 auto;
     width:calc(50vw - 56px);
     min-width:0;
     cursor:pointer;
   }
+  #console{ flex:0 0 auto }
   /* No forced width here any more — #controlsBar is only 3 cells wide now
      (see below), so #console just shrink-wraps around it; #topBar's
      justify-content:space-between keeps it flush against the right edge
@@ -656,19 +672,21 @@ body{
 
 <div class="hud" id="hud">
   <div id="topBar">
-    <!-- Two-step: the first press swaps the mark for EXIT?, the second follows
-         the link. Leaving is a one-way trip out of the app and this sits right
-         beside the logo (which is the knob-sheet toggle on a phone), so it is
-         easy to hit by accident. Same control, same contract, as Pinballa's. -->
-    <a id="ccExit" href="/" title="Back to Corruption Corp" aria-label="Back to Corruption Corp">
-      <img src="/hud/cclogo.png" alt="Corruption Corp" draggable="false">
-      <span class="cc-confirm" aria-hidden="true">EXIT?</span>
-    </a>
     <img id="logo" src="/fractalcrack/assets/fractalcrack-logo.png" alt="Fractal Crack" tabindex="0" role="button" aria-expanded="false" aria-label="Toggle controls">
     <div id="console">
       <div id="controlsBar" class="col g-controls"></div>
       <div id="knobPanel"></div>
     </div>
+    <!-- LAST in the bar on purpose: on a phone #topBar is a real flex row, so
+         DOM order is what puts this at the right-hand end, and on every other
+         viewport it positions itself into the top-right corner anyway.
+         Two-step: the first press swaps the mark for EXIT?, the second follows
+         the link. Leaving is a one-way trip out of the app, so an accidental
+         press is expensive. Same control, same contract, as Pinballa's. -->
+    <a id="ccExit" href="/" title="Back to Corruption Corp" aria-label="Back to Corruption Corp">
+      <img src="/hud/cclogo.png" alt="Corruption Corp" draggable="false">
+      <span class="cc-confirm" aria-hidden="true">EXIT?</span>
+    </a>
   </div>
   <div id="legend" role="status" aria-live="polite">
     <button id="lgClose" type="button" title="Deselect" aria-label="Deselect" hidden>&times;</button>
@@ -689,7 +707,22 @@ body{
 "use strict";
 
 const cvs = document.getElementById("gl");
-const gl = cvs.getContext("webgl2", {antialias:false, preserveDrawingBuffer:false});
+/* Context attributes are a real part of the frame budget here, not boilerplate:
+   - powerPreference: on a laptop with two GPUs the browser picks the INTEGRATED
+     one unless asked otherwise, and this is a full-screen fragment-bound toy —
+     that choice alone is the difference between 60 fps and half of it.
+   - alpha:false — the canvas is opaque (every shader writes a=1). Without this
+     the compositor blends the whole thing over the page on every frame.
+   - depth/stencil: never used. They are per-pixel attachments on the default
+     framebuffer; not asking for them saves the memory and the bandwidth. */
+const gl = cvs.getContext("webgl2", {
+  antialias:false,
+  preserveDrawingBuffer:false,
+  alpha:false,
+  depth:false,
+  stencil:false,
+  powerPreference:"high-performance"
+});
 if(!gl){
   document.body.insertAdjacentHTML("beforeend",
     '<div class="nogl">This needs WebGL2, which this browser did not provide.</div>');
@@ -835,11 +868,20 @@ void main(){
   p.x /= uAspect;
   p += uCenter + uPan;
 
-  vec2 dir = p - (uCenter + uPan);
+  /* Chroma bleed samples the three channels at three different offsets — but
+     at bleed 0 (the default, and most of the time) those are the same point,
+     so this was paying for three dependent texture fetches to fetch one thing.
+     uBleed is a uniform, so the branch is the same for every pixel in the draw
+     and costs nothing to take. */
   vec3 col;
-  col.r = samp(uPrev, p + dir*uBleed).r;
-  col.g = samp(uPrev, p).g;
-  col.b = samp(uPrev, p - dir*uBleed).b;
+  if(uBleed > 0.00002){
+    vec2 dir = p - (uCenter + uPan);
+    col.r = samp(uPrev, p + dir*uBleed).r;
+    col.g = samp(uPrev, p).g;
+    col.b = samp(uPrev, p - dir*uBleed).b;
+  } else {
+    col = samp(uPrev, p);
+  }
 
   /* the screen's sharpness control: an unsharp mask, re-applied every loop.
      This is what keeps regenerating fine detail instead of blurring away. */
@@ -891,6 +933,17 @@ void main(){
 
   o = vec4(softClip(max(col, 0.0)), 1.0);
 }`;
+
+/* Straight passthrough, used only when the ring is rebuilt: it carries the
+   picture from the old buffers into the new ones (scaled by the sampler's own
+   LINEAR filter) so that resizing the window, moving Resolution or Delay, or
+   the adaptive quality below does not throw the frame away and start again
+   from noise. */
+const FRAG_COPY = `#version 300 es
+precision highp float;
+in vec2 v; out vec4 o;
+uniform sampler2D uTex;
+void main(){ o = vec4(texture(uTex, v).rgb, 1.0); }`;
 
 const FRAG_DISPLAY = `#version 300 es
 precision highp float;
@@ -946,6 +999,7 @@ function program(fsrc){
 const progSeed = program(FRAG_SEED);
 const progFb   = program(FRAG_FEEDBACK);
 const progDisp = program(FRAG_DISPLAY);
+const progCopy = program(FRAG_COPY);
 
 const quad = gl.createBuffer();
 gl.bindBuffer(gl.ARRAY_BUFFER, quad);
@@ -957,7 +1011,8 @@ function uni(pr, name){ return gl.getUniformLocation(pr, name); }
 const U = {
   seed:{ time:uni(progSeed,"uTime"), aspect:uni(progSeed,"uAspect") },
   fb:{},
-  disp:{ tex:uni(progDisp,"uTex"), px:uni(progDisp,"uPx"), bloom:uni(progDisp,"uBloom"), scan:uni(progDisp,"uScan"), lines:uni(progDisp,"uLines") }
+  disp:{ tex:uni(progDisp,"uTex"), px:uni(progDisp,"uPx"), bloom:uni(progDisp,"uBloom"), scan:uni(progDisp,"uScan"), lines:uni(progDisp,"uLines") },
+  copy:{ tex:uni(progCopy,"uTex") }
 };
 ["uPrev","uDelay","uCustom","uCenter","uPx","uTime","uAspect","uZoom","uRot","uWarp","uPan",
  "uBright","uContrast","uSat","uHue","uGain","uSharp","uBleed","uDelayMix","uEdge","uKaleido",
@@ -965,9 +1020,17 @@ const U = {
   .forEach(n => U.fb[n] = uni(progFb, n));
 
 /* ---------- ring of framebuffers (ping-pong + delay history) ---------- */
-const RING = 16;
+/* RING_MAX is what the Delay knob's ceiling needs: fourteen frames of history
+   plus the one being read and the one being written. The ring is only ever
+   allocated as deep as the CURRENT delay setting needs, though — every slot is
+   a full render target, so sixteen of them at 1280 is ~47 MB of GPU memory,
+   while at rest (delay off, which is the default) two of them is ~6 MB. On a
+   phone that difference is the difference between running and having the
+   driver evict something mid-frame. */
+const RING_MAX = 16;
 let ring = [];
 let W = 0, H = 0, head = 0;
+function ringNeed(){ return Math.max(2, Math.min(RING_MAX, (P.delayFrames|0) + 2)); }
 
 /* Stand-in for the custom-shape sampler while nothing has been uploaded.
    It must not be a ring texture: sampling the framebuffer we are drawing
@@ -995,27 +1058,130 @@ function makeTarget(w, h){
   return {tex, fbo};
 }
 
+/* Straight blit of one ring texture into another, at whatever size the
+   destination is — the sampler's own LINEAR filter does the scaling. */
+function copyInto(dst, srcTex, w, h){
+  gl.useProgram(progCopy);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
+  gl.viewport(0, 0, w, h);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, srcTex);
+  gl.uniform1i(U.copy.tex, 0);
+  drawQuad();
+}
+
+/* ------------------------------------------------------------------ */
+/*  Adaptive quality                                                   */
+/*                                                                     */
+/*  The feedback loop is pinned to 60 Hz, so "smooth" means one step    */
+/*  landing per display frame. A device that cannot manage that at full */
+/*  resolution has only two ways to fail — fall behind wall clock, or   */
+/*  stutter — and neither is acceptable, so it takes the third: ask the */
+/*  GPU for fewer pixels until it keeps up, and hand them back once     */
+/*  there is headroom again. The picture survives the change (see       */
+/*  allocate below), so this is invisible apart from the softening.     */
+/*                                                                     */
+/*  It is a MULTIPLIER on the Resolution knob, not a replacement for    */
+/*  it: turning that knob is the user saying what they want, so doing   */
+/*  so resets this back to full and lets it re-measure from there.      */
+/* ------------------------------------------------------------------ */
+const QUALITY = [1, 0.85, 0.72, 0.6, 0.5];
+let qi = 0;                        // index into QUALITY; 0 is "all of it"
+const SAMPLE_FRAMES = 60;          // one measurement window, about a second
+const SLOW_MS = 20;                // worse than ~50 fps: not keeping up
+const FAST_MS = 17.2;              // better than ~58 fps: room to give back
+const RECOVER_WINDOWS = 8;         // ...sustained this long before giving it
+const SETTLE_MS = 1500;            // a rebuild is itself a hitch; don't read it
+const STALL_MS = 100;              // longer than this is a stall, not a frame
+let samples = 0, sampleSum = 0, goodWindows = 0;
+let lastDownAvg = 0;
+let adaptOff = false;
+let settleUntil = 0;
+
+function resetAdaptive(){
+  qi = 0; samples = 0; sampleSum = 0; goodWindows = 0;
+  lastDownAvg = 0; adaptOff = false;
+}
+
+function tune(avg){
+  if(avg > SLOW_MS && qi < QUALITY.length - 1){
+    /* Did the last reduction actually buy anything? If it did not, this is not
+       a GPU short of time — it is a display that simply does not run at 60 Hz
+       (a 50 Hz panel, a power-saving mode, a throttled background window).
+       Fewer pixels cannot fix that, so put them back and stop trying, rather
+       than grinding all the way down to the floor for nothing. */
+    if(lastDownAvg && avg > lastDownAvg * 0.95){
+      qi = Math.max(0, qi - 1);
+      adaptOff = true;
+      allocate();
+      return;
+    }
+    lastDownAvg = avg;
+    qi++;
+    goodWindows = 0;
+    allocate();
+  } else if(avg < FAST_MS){
+    lastDownAvg = 0;
+    if(qi > 0 && ++goodWindows >= RECOVER_WINDOWS){
+      goodWindows = 0;
+      qi--;
+      allocate();
+    }
+  } else {
+    goodWindows = 0;                // in the dead band: leave it where it is
+  }
+}
+
 function allocate(){
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  let w = Math.max(2, Math.round(window.innerWidth  * dpr * P.res));
-  let h = Math.max(2, Math.round(window.innerHeight * dpr * P.res));
-  /* RING is sixteen buffers deep (that IS the delay line), so every pixel of
-     the render target is paid for sixteen times over in GPU memory — about
-     48 MB at 1280. A phone is holding the browser and the rest of the page in
-     the same budget, and cannot show that many pixels anyway, so a coarse
-     pointer caps at 960 (~27 MB) instead. */
+  const scale = P.res * QUALITY[qi];
+  let w = Math.max(2, Math.round(window.innerWidth  * dpr * scale));
+  let h = Math.max(2, Math.round(window.innerHeight * dpr * scale));
+  /* A phone cannot show 1280 of anything and is holding the browser and the
+     rest of the page in the same GPU budget, so a coarse pointer caps lower. */
   const cap = COARSE ? 960 : 1280;
   const m = Math.max(w, h);
-  if(m > cap){ w = Math.round(w * cap/m); h = Math.round(h * cap/m); }
-  if(w === W && h === H) return;
-  W = w; H = h;
-  dirty = true;
+  if(m > cap){ w = Math.max(2, Math.round(w * cap/m)); h = Math.max(2, Math.round(h * cap/m)); }
+  const n = ringNeed();
+  if(w === W && h === H && n === ring.length) return;
+
+  const old = ring, oldN = old.length, oldHead = head;
+  const next = [];
+  for(let i = 0; i < n; i++) next.push(makeTarget(w, h));
+  /* Drop every binding before drawing into the new targets — and before the
+     old ones are deleted out from under a live one. */
+  for(let u = 0; u < 3; u++){
+    gl.activeTexture(gl.TEXTURE0 + u);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+  }
+
+  ring = next; W = w; H = h;
   cvs.width = w; cvs.height = h;
-  ring.forEach(t => { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fbo); });
-  ring = [];
-  for(let i=0;i<RING;i++) ring.push(makeTarget(w, h));
-  head = 0;
-  seedAll();
+
+  if(oldN){
+    /* Carry the picture across instead of reseeding it. Resizing the window,
+       or moving Resolution or Delay, used to throw the frame away and start
+       again from noise — and adaptive quality would have done that on its own,
+       unasked, mid-session. Slot n-1 gets the newest frame, n-2 the one before
+       it and so on, because that is what step() and present() read relative to
+       head, which restarts at 0. Where the new ring is DEEPER than the old
+       one the oldest frame is repeated into the rest, so a delay line that has
+       just been lengthened reads a held frame rather than noise. */
+    for(let k = 0; k < n; k++){
+      const j = Math.min(k, oldN - 1);
+      copyInto(next[n - 1 - k], old[(oldHead + oldN - 1 - j) % oldN].tex, w, h);
+    }
+    head = 0;
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+  } else {
+    head = 0;
+    seedAll();
+  }
+
+  old.forEach(t => { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fbo); });
+  dirty = true;
+  settleUntil = performance.now() + SETTLE_MS;
 }
 
 /* ---------- state ---------- */
@@ -1054,16 +1220,17 @@ function seedAll(){
     gl.activeTexture(gl.TEXTURE0 + u);
     gl.bindTexture(gl.TEXTURE_2D, null);
   }
-  for(let i=0;i<RING;i++) seedInto(i);
+  for(let i=0;i<ring.length;i++) seedInto(i);
   gen = 0;
   dirty = true;
 }
 
 /* ---------- feedback step ---------- */
 function step(t){
-  const prevIdx  = (head + RING - 1) % RING;
-  const dF = Math.min(P.delayFrames|0, RING - 2);
-  const delayIdx = (head + RING - 1 - dF) % RING;
+  const N = ring.length;            // the ring is sized to the delay in use
+  const prevIdx  = (head + N - 1) % N;
+  const dF = Math.min(P.delayFrames|0, N - 2);
+  const delayIdx = (head + N - 1 - dF) % N;
 
   gl.useProgram(progFb);
   gl.bindFramebuffer(gl.FRAMEBUFFER, ring[head].fbo);
@@ -1113,13 +1280,13 @@ function step(t){
 
   drawQuad();
 
-  head = (head + 1) % RING;
+  head = (head + 1) % N;
   gen++;
   pulse *= 0.80;
 }
 
 function present(){
-  const outIdx = (head + RING - 1) % RING;
+  const outIdx = (head + ring.length - 1) % ring.length;
   gl.useProgram(progDisp);
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.viewport(0, 0, cvs.width, cvs.height);
@@ -1140,17 +1307,45 @@ const STEP_MS = 1000/60;
 let last = performance.now(), acc = 0;
 function frame(now){
   requestAnimationFrame(frame);
-  const dt = Math.min(now - last, 250); last = now;
+  const raw = now - last; last = now;
+  let dt = Math.min(raw, 250);
+  /* Snap a near-60 Hz frame to exactly one step. A display that calls itself
+     60 Hz actually delivers 16.60-16.75 ms, and rAF adds its own jitter on top
+     — a bare accumulator turns that into a 1,1,0,1,1,0 step pattern. The
+     average rate is right and the picture still advances unevenly, and uneven
+     is exactly what reads as dropped frames. Only JITTER is absorbed (+-12%),
+     never a real difference in refresh rate: a 50 Hz display still goes
+     through the accumulator and still runs at wall-clock speed. */
+  if(dt > STEP_MS * 0.88 && dt < STEP_MS * 1.12) dt = STEP_MS;
   const t = (now - startT) / 1000;
   let stepped = 0;
   if(playing){
     acc += dt;
-    let guard = 0;
-    while(acc >= STEP_MS && guard < 4){
-      for(let i = 0, n = P.iters|0; i < n; i++) step(t);
-      acc -= STEP_MS; guard++; stepped++;
+    const n = Math.max(1, P.iters|0);
+    /* Two caps, not one. Ticks bound how far the loop will chase a late frame;
+       PASSES bounds the GPU work it can spend doing so, because Loops/frame
+       multiplies every tick — under the old tick-only guard, iters 3 could
+       fire twelve full-screen passes inside one frame, which guaranteed the
+       next frame was late as well. That is the spiral this stops; sustained
+       slowness is answered by dropping quality instead (see tune). */
+    let ticks = 0, passes = 0;
+    while(acc >= STEP_MS && ticks < 4 && passes + n <= 8){
+      for(let i = 0; i < n; i++) step(t);
+      passes += n; ticks++; stepped++;
+      acc -= STEP_MS;
     }
     if(acc > STEP_MS*4) acc = 0;
+    /* Measure only while the loop is actually working, only once a rebuild has
+       settled, and never across a stall — a tab coming back to the front is
+       not a frame rate. */
+    if(!adaptOff && now >= settleUntil && raw < STALL_MS){
+      sampleSum += raw; samples++;
+      if(samples >= SAMPLE_FRAMES){
+        const avg = sampleSum / samples;
+        samples = 0; sampleSum = 0;
+        tune(avg);
+      }
+    }
   }
   /* Draw only when there is something new to draw: a step ran, or something
      outside the loop marked the frame dirty (a display knob, a resize, a tab
@@ -1476,7 +1671,14 @@ function setValue(c, val){
     v = Math.round(v / d.step) * d.step;
     v = Math.max(d.min, Math.min(d.max, v));
     P[d.k] = parseFloat(v.toPrecision(10));
-    if(d.k === "res") scheduleAlloc();
+    /* Both of these change what has to be allocated: res the size of every
+       target, delayFrames how many of them there are. Debounced through
+       scheduleAlloc so dragging a knob across its range rebuilds once at the
+       end rather than at every value on the way. */
+    if(d.k === "res" || d.k === "delayFrames") scheduleAlloc();
+    /* Moving Resolution is the user saying what they want — let the adaptive
+       multiplier start again from full, relative to the value they just set. */
+    if(d.k === "res") resetAdaptive();
   }
   refreshKnobs();
 }
@@ -1645,6 +1847,7 @@ function randomize(){
   /* Seed motion is left alone on purpose: randomising it sets the injection
      wandering, and where it sits is the user's call, not the dice. */
   refreshKnobs();
+  scheduleAlloc();                   // delayFrames moved: the ring is resized
 }
 
 /* uploaded png becomes an injectable shape */
