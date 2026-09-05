@@ -31,9 +31,18 @@
 <meta name="twitter:image" content="https://corruptioncorp.net/share/fractalcrack.png" />
 <meta name="theme-color" content="#000000" />
 <link rel="icon" type="image/png" href="/fractalcrack/assets/fractal-crack-favicon.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<!-- CRENZO is the only font this hud ever renders in, and it is ours and
+     same-origin — so it is preloaded (a webfont is otherwise not discovered
+     until the stylesheet has been parsed AND something needing it has been
+     laid out) and nothing else is fetched at all.
+
+     There used to be a Google-hosted IBM Plex Mono here as the fallback, which
+     cost two cross-origin handshakes and a RENDER-BLOCKING stylesheet on every
+     visit to pay for a face that only renders if CRENZO fails. The stack below
+     falls back to the platform's own monospace instead, which costs nothing
+     and is already on the machine. (The splash deliberately never waited on
+     document.fonts.ready for the same reason — see hideSplashWhenDressed.) -->
+<link rel="preload" href="/fractalcrack/assets/fonts/CRENZO.ttf" as="font" type="font/ttf" crossorigin>
 <style>
 @font-face{
   font-family:"CRENZO";
@@ -98,14 +107,41 @@
   --console-w: calc(6 * var(--cell) + 5 * var(--gap));
   --console-h: calc(7 * var(--cell) + 6 * var(--gap));
   --hud-fade: .45s ease;
+  /* The CC exit plate's own footprint, so #logo can clear it by name rather
+     than by a magic number that has to be re-derived every time the plate
+     changes size. The portrait bar below pins its own smaller pair. */
+  --cc-exit-w: 76px;
+  --cc-exit-h: 38px;
 }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
 html,body{height:100%; overscroll-behavior:none}
+
+/* ---------- double-click / long-press defences ----------
+   Nothing in the hud is text, and every control is artwork. A double-click on
+   one used to hand the browser a selection anyway: a highlight box flashing
+   over the console art, and on some engines an <img> left "selected" until you
+   clicked somewhere else. So the whole layer opts out of selection, images opt
+   out of the drag ghost and the long-press save/copy callout, and the one
+   thing that IS text — the legend's type-a-value box — opts back in. See also
+   the dblclick/selectstart guards in the script. */
+.hud,
+.hud *{
+  -webkit-user-select:none;
+  user-select:none;
+}
+#legend .lg-value-edit{
+  -webkit-user-select:text;
+  user-select:text;
+}
+img{
+  -webkit-user-drag:none;
+  -webkit-touch-callout:none;
+}
 body{
   margin:0;
   background:#000;
   color:#e8ecf2;
-  font-family:"CRENZO","IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-family:"CRENZO",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   overflow:hidden;
 }
 
@@ -139,9 +175,53 @@ body{
    row, to vertically centre the two against each other. */
 #topBar{ display:contents }
 
+/* ---------- back to Corruption Corp ----------
+   The same control Pinballa carries, in the same two-step shape: this app
+   fills the tab, so following the link is a one-way trip out of it and an
+   accidental press is expensive. The first press swaps the mark for EXIT?,
+   the second navigates (see the script). A real <a href="/"> so it
+   middle-clicks, long-presses and previews like any other link.
+
+   Plate colours are Pinballa's — black line art on a light plate — which is
+   also the only readable option here: cclogo.png is black, and this app's
+   chrome is black. */
+#ccExit{
+  position:absolute; top:18px; left:20px;
+  width:var(--cc-exit-w); height:var(--cc-exit-h);
+  display:flex; align-items:center; justify-content:center;
+  padding:5px 8px;
+  border:1px solid rgba(0,0,0,.45);
+  border-radius:8px;
+  background:#f2f2f2;
+  color:#111;
+  text-decoration:none;
+  cursor:pointer;
+  transition:background .15s ease, border-color .15s ease;
+}
+@media (hover:hover) and (pointer:fine){
+  #ccExit:hover{ background:#fff; border-color:#000 }
+}
+#ccExit:focus-visible{outline:2px solid #fff; outline-offset:3px}
+#ccExit img{
+  max-width:100%; max-height:100%;
+  width:auto; height:auto;
+  object-fit:contain;
+  pointer-events:none;
+}
+/* Armed: the mark is replaced by the word IN THE SAME BOX, so the plate never
+   changes size between the two states. */
+#ccExit .cc-confirm{
+  display:none;
+  font-family:inherit;
+  font-size:13px; font-weight:600; letter-spacing:.06em;
+  color:inherit;
+}
+#ccExit.confirming img{display:none}
+#ccExit.confirming .cc-confirm{display:block}
+
 /* ---------- logo ---------- */
 #logo{
-  position:absolute; top:18px; left:20px;
+  position:absolute; top:18px; left:calc(20px + var(--cc-exit-w) + 12px);
   width:25vw;               /* one quarter of the viewport */
   min-width:120px;
   height:auto;
@@ -329,6 +409,53 @@ body{
   padding:40px; text-align:center; color:#8b93a1; z-index:20;
 }
 
+/* ---------- photo mode prompt ----------
+   Deliberately a SIBLING of .hud, not a child: photo mode's whole job is to
+   take the hud away, and .hud.idle also kills pointer-events on everything
+   inside it. It shows for a second on entering and fades out; the hud does not
+   come back until Escape (see enterPhoto/exitPhoto). Never interactive — the
+   only way out is the key. */
+#photoHint{
+  position:fixed; top:5.5vh; left:50%;
+  transform:translateX(-50%);
+  z-index:11;
+  padding:0 16px;
+  max-width:100vw;
+  font-size:13px; letter-spacing:.18em; text-transform:uppercase;
+  color:#8b909a;
+  text-shadow:0 2px 12px rgba(0,0,0,.85);
+  white-space:nowrap;
+  pointer-events:none;
+  opacity:0;
+  transition:opacity .55s ease;
+}
+#photoHint.show{
+  opacity:1;
+  transition:opacity .16s ease;
+}
+
+/* ---------- touch hit pads ----------
+   The drawn control is a circle of --cell with about --gap of nothing between
+   it and its neighbour, and border-radius clips hit testing as well as paint —
+   so on a phone a tap in the space between two knobs, or on a knob's own
+   clipped corner, landed on the row and did nothing at all. Every cell grows
+   an invisible SQUARE pad that overlaps its neighbours', leaving no dead space
+   in a row; hit testing counts a pseudo-element as part of the element that
+   owns it, so the button's own box, its artwork and the selection ring are all
+   untouched. Mouse pointers keep the exact circle they can see.
+
+   --hit is also what the portrait sheet pads its rows by, so the pads are not
+   clipped away by those rows' own overflow — keep the two in step. */
+@media (pointer:coarse){
+  .cell{ --hit:7px }
+  .cell::before{
+    content:"";
+    position:absolute;
+    inset:calc(var(--hit) * -1);
+    border-radius:8px;
+  }
+}
+
 /* ---------- desktop placement ----------
    Console in the bottom-right corner with the legend stacked directly above
    it, both pinned to the same --console-w so they read as one panel. The
@@ -379,15 +506,28 @@ body{
     display:flex;
     align-items:center;
     justify-content:space-between;
+    gap:10px;
     position:absolute;
     top:16px; left:20px; right:18px;
   }
+  /* The exit plate joins the row as a flex item instead of positioning itself,
+     and shrinks: a phone's top bar has to hold it, the logo AND the controls
+     block. It stays first, so it keeps the top-LEFT corner it has on desktop. */
+  #ccExit{
+    --cc-exit-w:52px;
+    --cc-exit-h:32px;
+    position:static;
+    flex:0 0 auto;
+  }
+  #ccExit .cc-confirm{ font-size:11px }
   /* Both boxes are "half the screen width" — #logo trimmed by half a 12px
      gap so it doesn't butt straight up against #console once both are
      flex items sharing #topBar's width instead of independently inset. */
   #logo{
     position:static;
-    width:calc(50vw - 25px);
+    /* Was "half the screen less half the gap". The exit plate and its gap now
+       come out of the same half, so the three boxes still fit a 320px phone. */
+    width:calc(50vw - 56px);
     min-width:0;
     cursor:pointer;
   }
@@ -429,7 +569,10 @@ body{
     position:fixed; left:0; right:0; bottom:0; top:auto;
     flex-direction:column;
     align-items:stretch;
-    gap:14px;
+    /* No gap: each row carries --hit of vertical padding instead (below), so
+       adjacent rows' hit pads meet exactly and nothing between them is dead.
+       Row pitch is unchanged — the 14px that was here moved into the rows. */
+    gap:0;
     margin:0;
     padding:14px 16px calc(14px + env(safe-area-inset-bottom, 0px));
     max-height:62vh;
@@ -456,7 +599,10 @@ body{
     overflow-y:hidden;
     -webkit-overflow-scrolling:touch;
     touch-action:pan-x;
-    padding-bottom:2px;
+    /* A scroll container clips at its PADDING box, so without this the hit
+       pads above/below each cell would be clipped straight back off. Keep in
+       step with --hit. */
+    padding:7px 0;
   }
   /* .cell::after / :focus-visible are a WHITE ring — right everywhere else
      (dark canvas showing through), invisible against #knobPanel's white
@@ -485,7 +631,7 @@ body{
 }
 
 @media (prefers-reduced-motion:reduce){
-  .hud,#legend,.cell::after,#fc-splash{transition:none}
+  .hud,#legend,.cell::after,#fc-splash,#photoHint,#ccExit{transition:none}
   .fc-splash-loader{animation:none}
 }
 @media (prefers-reduced-motion:reduce) and (max-width:900px) and (orientation:portrait){
@@ -510,6 +656,14 @@ body{
 
 <div class="hud" id="hud">
   <div id="topBar">
+    <!-- Two-step: the first press swaps the mark for EXIT?, the second follows
+         the link. Leaving is a one-way trip out of the app and this sits right
+         beside the logo (which is the knob-sheet toggle on a phone), so it is
+         easy to hit by accident. Same control, same contract, as Pinballa's. -->
+    <a id="ccExit" href="/" title="Back to Corruption Corp" aria-label="Back to Corruption Corp">
+      <img src="/hud/cclogo.png" alt="Corruption Corp" draggable="false">
+      <span class="cc-confirm" aria-hidden="true">EXIT?</span>
+    </a>
     <img id="logo" src="/fractalcrack/assets/fractalcrack-logo.png" alt="Fractal Crack" tabindex="0" role="button" aria-expanded="false" aria-label="Toggle controls">
     <div id="console">
       <div id="controlsBar" class="col g-controls"></div>
@@ -525,6 +679,8 @@ body{
     <div class="lg-lock" id="lgLock"></div>
   </div>
 </div>
+
+<div id="photoHint" role="status" aria-live="polite"></div>
 
 <input type="file" id="fileIn" accept="image/png,image/jpeg,image/webp" hidden>
 
@@ -571,6 +727,13 @@ const DEFAULTS = Object.assign({}, P);
 const EDGES  = ["mirror","wrap","clamp","black"];
 const SHAPES = ["none","dot","ring","bar","noise"];
 const CUSTOM_INDEX = 5;
+
+/* One place decides "this is a touch device". Read once: a pointer does not
+   become fine because the window was resized, and the two things that key off
+   it — the render target's memory budget and which way out of photo mode is
+   advertised — are both chosen once. Anything that must follow the live
+   viewport is a media query instead (the knob sheet, the hit pads). */
+const COARSE = window.matchMedia("(pointer: coarse)").matches;
 
 /* ------------------------------------------------------------------ */
 /*  Shaders                                                            */
@@ -836,11 +999,17 @@ function allocate(){
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   let w = Math.max(2, Math.round(window.innerWidth  * dpr * P.res));
   let h = Math.max(2, Math.round(window.innerHeight * dpr * P.res));
-  const cap = 1280;
+  /* RING is sixteen buffers deep (that IS the delay line), so every pixel of
+     the render target is paid for sixteen times over in GPU memory — about
+     48 MB at 1280. A phone is holding the browser and the rest of the page in
+     the same budget, and cannot show that many pixels anyway, so a coarse
+     pointer caps at 960 (~27 MB) instead. */
+  const cap = COARSE ? 960 : 1280;
   const m = Math.max(w, h);
   if(m > cap){ w = Math.round(w * cap/m); h = Math.round(h * cap/m); }
   if(w === W && h === H) return;
   W = w; H = h;
+  dirty = true;
   cvs.width = w; cvs.height = h;
   ring.forEach(t => { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fbo); });
   ring = [];
@@ -851,6 +1020,14 @@ function allocate(){
 
 /* ---------- state ---------- */
 let playing = true;
+/* Paused, the loop computes nothing — so the only things that can change what
+   is ON SCREEN are the display shader's own knobs (bloom, scanlines) and the
+   canvas being resized. Without this, pausing to look at a frame still cost a
+   full-screen fragment pass sixty times a second, bloom's nine texture fetches
+   per pixel included: real battery, for an image that is not moving. Set
+   generously — the cost of a redundant present is one frame, the cost of a
+   missed one is a stale picture. */
+let dirty = true;
 let gen = 0;
 const center = {x:0.5, y:0.5};      // vanishing point, fixed at frame centre
 const seedPos = {x:0.5, y:0.5};     // where the seed lands this frame
@@ -879,6 +1056,7 @@ function seedAll(){
   }
   for(let i=0;i<RING;i++) seedInto(i);
   gen = 0;
+  dirty = true;
 }
 
 /* ---------- feedback step ---------- */
@@ -964,17 +1142,27 @@ function frame(now){
   requestAnimationFrame(frame);
   const dt = Math.min(now - last, 250); last = now;
   const t = (now - startT) / 1000;
+  let stepped = 0;
   if(playing){
     acc += dt;
     let guard = 0;
     while(acc >= STEP_MS && guard < 4){
       for(let i = 0, n = P.iters|0; i < n; i++) step(t);
-      acc -= STEP_MS; guard++;
+      acc -= STEP_MS; guard++; stepped++;
     }
     if(acc > STEP_MS*4) acc = 0;
   }
-  present();
+  /* Draw only when there is something new to draw: a step ran, or something
+     outside the loop marked the frame dirty (a display knob, a resize, a tab
+     coming back to the front). The loop is deliberately pinned to 60 Hz, so on
+     a 144 Hz display more than half of these frames used to re-present an
+     image identical to the one already on screen — and while PAUSED, all of
+     them did. */
+  if(stepped || dirty){ present(); dirty = false; }
 }
+/* A tab coming back to the front has been composited by someone else in the
+   meantime; redraw once rather than trusting what is left on the canvas. */
+document.addEventListener("visibilitychange", () => { if(!document.hidden) dirty = true; });
 
 /* ------------------------------------------------------------------ */
 /*  Console definition                                                 */
@@ -994,7 +1182,9 @@ const GROUPS = [
     {t:"btn", act:"upload", icon:"upload.png", label:"Upload shape"}
   ]},
   { id:"camera", name:"Camera", accent:"#4a50e8", items:[
-    {t:"hdr", icon:"camera.png", label:"Camera"},
+    /* The one header besides Display's that does something: it takes the whole
+       hud away so the frame can be looked at (or captured) clean. */
+    {t:"hdr", icon:"camera.png", label:"Camera", act:"photo", aria:"Hide the controls"},
     {t:"knob", k:"zoom", label:"Zoom",      min:0.960, max:1.040, step:0.001, fmt:f3},
     {t:"knob", k:"rot",  label:"Rotation",  min:-6, max:6, step:0.05, fmt:v=>f2(v)+"°"},
     {t:"knob", k:"panX", label:"Pan X",     min:-0.06, max:0.06, step:0.001, fmt:f3},
@@ -1111,9 +1301,21 @@ GROUPS.forEach(g => {
 });
 
 function refreshKnobs(){
+  /* Called on EVERY value change, which during a drag is every pointermove.
+     Writing a transform into all twenty-nine hands each time dirtied all
+     twenty-nine compositor layers (each one is a will-change:transform inside
+     a drop-shadowed cell, so each invalidation is a filter surface to
+     re-render) to move exactly one of them. Compare the string that would be
+     written — floats out of angleFor() differ in noise the rendered value
+     doesn't. */
   cells.forEach(c => {
-    if(c.hand) c.hand.style.transform = "rotate(" + angleFor(c).toFixed(2) + "deg)";
+    if(!c.hand) return;
+    const deg = angleFor(c).toFixed(2);
+    if(deg === c.deg) return;
+    c.deg = deg;
+    c.hand.style.transform = "rotate(" + deg + "deg)";
   });
+  dirty = true;                       // a display knob may have moved the frame
   if(legendTarget()) drawLegend(legendTarget());
 }
 
@@ -1130,28 +1332,22 @@ const lgClose = document.getElementById("lgClose");
 
 lgClose.addEventListener("click", e => { e.stopPropagation(); select(null); });
 
-/* Touch has no passive hover, so exploring the sheet by dragging a finger
-   around it shows nothing today — worse for the inert header icons, which
-   have no tap action of their own and are otherwise undiscoverable on
-   mobile. This previews whichever cell is currently under the finger, live,
-   the same way desktop's mouse hover already does via each cell's own
-   pointerenter/leave below. It never fires mid-knob-drag: that pointer is
-   captured to the knob itself (see wire()), so this listener simply never
-   sees its move events — only an uncaptured touch (started on a header, or
-   on empty space between cells) reaches it. Landing the tap ON a knob and
-   releasing there still locks it, same as a click always has: releasing an
-   uncaptured pointer over an element is what the browser bases its
-   synthesized click on. */
-knobPanelEl.addEventListener("pointermove", e => {
-  if(e.pointerType !== "touch") return;
-  const hit = document.elementFromPoint(e.clientX, e.clientY);
-  const cellEl = hit && hit.closest(".cell");
-  const c = cellEl ? cells.find(x => x.el === cellEl) : null;
-  if(c !== hovered){ hovered = c; updateLegend(); }
-}, {passive:true});
-knobPanelEl.addEventListener("pointerleave", () => {
-  if(hovered){ hovered = null; updateLegend(); }
-});
+/* Touch has no passive hover, so PRESSING a control is what previews it: hold
+   a knob and it appears in the legend, keep holding and drag up/down to move
+   its value, let go and the legend follows whatever is selected again (see
+   wire()). Header icons — inert, with no tap action of their own — get the
+   same press-to-read, which is what makes them discoverable at all on a phone.
+   Every cell's own pointerenter/leave does the work; touch fires those either
+   side of the press, and pointer capture suppresses the leave for the duration
+   of a drag, which is exactly the behaviour wanted.
+ 
+   This used to be a roaming preview instead: a pointermove listener here that
+   elementFromPoint'ed whatever the finger was over. It was NOT inert during a
+   knob drag the way its comment claimed — pointer capture RETARGETS move
+   events to the knob, it does not stop them bubbling on up to this element —
+   so dragging a knob upwards handed the legend to whichever cell the finger
+   had crossed onto, or blanked it once the finger left the sheet. The value
+   being changed was the one thing you could not read while changing it. */
 
 function legendTarget(){ return hovered || selected; }
 
@@ -1308,8 +1504,16 @@ function wire(c){
     dragging = true; moved = 0;
     startY = e.clientY;
     startVal = P[d.k];
+    /* Touch has no passive hover: the press IS the hover, so the knob goes
+       into the legend now and stays there for as long as the finger is down —
+       which is the whole drag. (A mouse already got here through pointerenter;
+       setting it again is a no-op.) */
+    hovered = c; updateLegend();
     dragCount++; wake();                // hold the hud open while adjusting
-    el.setPointerCapture(e.pointerId);
+    // Guarded like the release below: capture is a nicety (it's what keeps the
+    // drag — and the legend — attached to this knob once the finger leaves it),
+    // and a throw here would take the preventDefault below down with it.
+    try{ el.setPointerCapture(e.pointerId); }catch(_){}
     e.preventDefault();
   });
 
@@ -1330,6 +1534,13 @@ function wire(c){
     if(!dragging) return;
     dragging = false;
     dragCount = Math.max(0, dragCount - 1);
+    /* Releasing a touch ends the "hover" it stood in for. Only refreshed here
+       for a real DRAG: a tap is followed by a click that calls select(), which
+       redraws the legend anyway, and hiding it in between would flash it. */
+    if(e.pointerType === "touch" && hovered === c){
+      hovered = null;
+      if(moved > 3) updateLegend();
+    }
     wake();                             // restart the idle countdown
     try{ el.releasePointerCapture(e.pointerId); }catch(_){}
   };
@@ -1375,6 +1586,7 @@ cells.forEach(c => { if(c.def.act === "play") playGlyph = c.glyph; });
 
 function setPlaying(v){
   playing = v;
+  dirty = true;
   if(playGlyph) playGlyph.src = "/fractalcrack/assets/" + (v ? "pause.png" : "play.png");
 }
 
@@ -1395,6 +1607,7 @@ function doAction(act, c){
   else if(act === "random") randomize();
   else if(act === "upload") fileIn.click();
   else if(act === "fullscreen") toggleFullscreen();
+  else if(act === "photo") enterPhoto();
 }
 
 function toggleFullscreen(){
@@ -1476,6 +1689,10 @@ function placeSeed(e){
   seedAnchor.y = Math.min(1, Math.max(0, e.clientY / window.innerHeight));
 }
 function duckHud(){
+  // The knob sheet is something you are working IN, not a label glanced at —
+  // taking it away because a finger also touched the canvas behind it would
+  // close the menu out from under the hand holding it open.
+  if(sheetOpen()) return;
   hud.classList.add("idle");        // out of the way while working on the canvas
   clearTimeout(idleTimer);
 }
@@ -1510,7 +1727,13 @@ cvs.addEventListener("pointercancel", () => {
   leftDown = rightDown = false; drawHold = 0; wake();
 });
 
-cvs.addEventListener("dblclick", () => { seedAnchor.x = 0.5; seedAnchor.y = 0.5; });
+cvs.addEventListener("dblclick", () => {
+  // A phone has no Escape key, so a double-tap is photo mode's way out there.
+  // It takes priority: recentring the seed is not what someone staring at a
+  // hidden hud is trying to do.
+  if(photoMode){ exitPhoto(); return; }
+  seedAnchor.x = 0.5; seedAnchor.y = 0.5;
+});
 
 /* Touch has no right button, so a SECOND simultaneous touch stands in for it
    — a common two-finger-for-secondary-action convention. Every touch already
@@ -1556,11 +1779,66 @@ let idleTimer = null;
    time, because an on-screen keyboard generates no window keydown/pointer
    events to keep resetting the timer. */
 const IDLE_MS = 2000;
+
+/* ------------------------------------------------------------------ */
+/*  Photo mode — the camera button                                     */
+/*                                                                     */
+/*  Puts the whole hud away for good and says so once, quietly, then    */
+/*  fades that away too. Unlike the idle auto-hide, NOTHING brings the  */
+/*  console back except leaving photo mode: moving the mouse, touching  */
+/*  the canvas and turning the wheel are all things you want to be able */
+/*  to do while the frame is clean, so wake() simply declines to run.   */
+/* ------------------------------------------------------------------ */
+const photoHint = document.getElementById("photoHint");
+const PHOTO_HINT_MS = 1000;
+let photoMode = false;
+let photoHintTimer = null;
+
+function showPhotoHint(){
+  /* Escape is the way out. A phone has no Escape key, so a coarse pointer is
+     told about the fallback instead — both are wired either way. */
+  photoHint.textContent = COARSE ? "double-tap to exit" : "press escape to exit";
+  photoHint.classList.add("show");
+  clearTimeout(photoHintTimer);
+  photoHintTimer = setTimeout(() => photoHint.classList.remove("show"), PHOTO_HINT_MS);
+}
+function enterPhoto(){
+  if(photoMode) return;
+  photoMode = true;
+  select(null);                       // nothing left locked behind the curtain
+  /* The camera button still holds focus from the click that got here, and the
+     key handler below reads off document.body — without this the first Escape
+     is spent on the button instead of on photo mode. */
+  if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  hud.classList.add("idle");
+  clearTimeout(idleTimer);
+  showPhotoHint();
+}
+function exitPhoto(){
+  if(!photoMode) return;
+  photoMode = false;
+  clearTimeout(photoHintTimer);
+  photoHint.classList.remove("show");
+  wake();
+}
+
+/* The knob sheet's class is toggled on every viewport, but it only MEANS
+   anything where the sheet exists — this is the same query its CSS uses, so
+   clicking the logo on a desktop can't quietly pin the hud open forever. */
+const SHEET_MQ = window.matchMedia("(max-width: 900px) and (orientation: portrait)");
+function sheetOpen(){ return SHEET_MQ.matches && hud.classList.contains("knobs-open"); }
+
 function wake(){
-  if(anyDown()){ hud.classList.add("idle"); return; } // stays hidden until release
+  if(photoMode) return;               // stays down until photo mode is left
+  /* An OPEN knob sheet holds the hud up the same way an adjustment in progress
+     does. It is a surface the user is working in — on a phone it is the only
+     way to reach the knobs at all — and fading it out from under them two
+     seconds after the last touch made it unusable. */
+  const held = sheetOpen();
+  if(anyDown() && !held){ hud.classList.add("idle"); return; } // stays hidden until release
   hud.classList.remove("idle");
   clearTimeout(idleTimer);
-  if(dragCount > 0 || editingCell) return;
+  if(dragCount > 0 || editingCell || held) return;
   idleTimer = setTimeout(() => hud.classList.add("idle"), IDLE_MS);
 }
 ["pointermove","pointerdown","wheel","keydown","touchstart"].forEach(ev =>
@@ -1577,8 +1855,63 @@ const logo = document.getElementById("logo");
 function setKnobsOpen(open){
   hud.classList.toggle("knobs-open", open);
   logo.setAttribute("aria-expanded", String(open));
+  // Opening cancels any idle countdown already scheduled (wake() won't set a
+  // new one while the sheet is up); closing starts one again from here.
+  wake();
 }
 logo.addEventListener("click", () => setKnobsOpen(!hud.classList.contains("knobs-open")));
+/* ------------------------------------------------------------------ */
+/*  Back to Corruption Corp — a two-step, same contract as Pinballa's  */
+/*                                                                     */
+/*  Following the link is a one-way trip out of the app, and the plate  */
+/*  sits right beside the logo (which on a phone is the knob sheet's    */
+/*  toggle), so the first press only ARMS it — the mark becomes EXIT? — */
+/*  and the second one navigates.                                      */
+/* ------------------------------------------------------------------ */
+const ccExit = document.getElementById("ccExit");
+if(ccExit){
+  const ARM_MS = 3000;      // armed this long, then it forgets
+  const MIN_MS = 350;       // ...but not answerable sooner than this
+  let armedAt = 0;
+  let armTimer = null;
+  const disarm = () => {
+    armedAt = 0;
+    ccExit.classList.remove("confirming");
+    ccExit.setAttribute("aria-label", "Back to Corruption Corp");
+    clearTimeout(armTimer);
+  };
+  ccExit.addEventListener("click", e => {
+    // A modified click is "open it over there", not "leave" — hand it straight
+    // to the browser without arming anything.
+    if(e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+    /* MIN_MS is what stops a DOUBLE-CLICK walking straight through the confirm
+       — two presses inside the same gesture are one mis-hit, not a decision. */
+    if(armedAt && Date.now() - armedAt >= MIN_MS) return;   // second press: navigate
+    e.preventDefault();
+    armedAt = Date.now();
+    ccExit.classList.add("confirming");
+    // The label has to move with it, or a screen reader still announces "Back
+    // to Corruption Corp" while the button is asking a question.
+    ccExit.setAttribute("aria-label", "Press again to leave Fractal Crack");
+    clearTimeout(armTimer);
+    armTimer = setTimeout(disarm, ARM_MS);
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/*  Double-click defences                                              */
+/*                                                                     */
+/*  The stylesheet already opts the hud out of selection; these cover   */
+/*  what CSS cannot — a dblclick's own default action, which is what    */
+/*  drags an <img> into a "selected" state on some engines, and any     */
+/*  selection the browser starts anyway. Bubble phase, so a control's   */
+/*  own dblclick handler (a knob's reset-to-default) still runs first.  */
+/*  The legend's type-a-value box is the one piece of real text in      */
+/*  here, so it is exempt from both.                                   */
+/* ------------------------------------------------------------------ */
+const notTypingIn = e => e.target !== lgValueInput;
+hud.addEventListener("dblclick", e => { if(notTypingIn(e)) e.preventDefault(); });
+hud.addEventListener("selectstart", e => { if(notTypingIn(e)) e.preventDefault(); });
 logo.addEventListener("keydown", e => {
   if(e.key !== "Enter" && e.key !== " ") return;
   e.preventDefault();
@@ -1589,6 +1922,9 @@ logo.addEventListener("keydown", e => {
 /*  Keys & resize                                                      */
 /* ------------------------------------------------------------------ */
 window.addEventListener("keydown", e => {
+  // Checked before the focus guard below: photo mode has no visible control to
+  // put focus on, so it must answer Escape wherever focus happens to be.
+  if(photoMode && e.key === "Escape"){ e.preventDefault(); exitPhoto(); return; }
   if(e.target !== document.body) return;
   if(e.code === "Space"){ e.preventDefault(); setPlaying(!playing); }
   else if(e.key === "r" || e.key === "R") doAction("reset");
@@ -1611,11 +1947,11 @@ window.addEventListener("resize", scheduleAlloc);
 /*  Two deliberate exceptions to "everything":                              */
 /*  - Broken assets resolve rather than reject (error counts as settled), so */
 /*    one 404 can't strand the boot.                                        */
-/*  - It does NOT wait on document.fonts.ready, which only settles once      */
-/*    EVERY requested font has, including the Google-hosted IBM Plex Mono    */
-/*    fallback nothing renders in unless CRENZO fails — a slow or blocked    */
-/*    font CDN would otherwise hold the splash hostage to a font this HUD    */
-/*    never actually uses.                                                  */
+/*  - It does NOT wait on document.fonts.ready, which settles only once     */
+/*    EVERY requested font has — including any the page never renders in.   */
+/*    (That used to be a Google-hosted IBM Plex Mono fallback, which is no   */
+/*    longer requested at all; see the head. Waiting on the one face that    */
+/*    IS used, by name, is what the fonts.load below does instead.)         */
 /*                                                                          */
 /*  The 8s timer in the inline script after <body> is the only ceiling left, */
 /*  and it's a true last resort: a request that never settles at all.        */
