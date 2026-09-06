@@ -109,11 +109,11 @@
   --hud-fade: .45s ease;
   /* The CC exit plate's own footprint, so the console can clear it by name
      rather than by a magic number that has to be re-derived every time the
-     plate changes size. The numbers are Pinballa's: its mark renders at 61x37
-     inside 8px/10px of padding and a 1px border, so this is the same control
-     at the same visible size, in a box that isn't stretched by a neighbour. */
-  --cc-exit-w: 83px;
-  --cc-exit-h: 55px;
+     plate changes size. This is the TARGET size — #ccExit also caps its width
+     against the hole it sits in, which is two cells wide and therefore as
+     narrow as 98px once --cell bottoms out at 46. */
+  --cc-exit-w: 96px;
+  --cc-exit-h: 62px;
 }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
 html,body{height:100%; overscroll-behavior:none}
@@ -206,15 +206,30 @@ body{
      plus the console's height, less the plate's own. */
   top:calc(16px + var(--console-h) - var(--cc-exit-h));
   right:18px;
-  width:var(--cc-exit-w); height:var(--cc-exit-h);
+  /* Never wider than the hole. That block is 2 cells + a gap, and --cell
+     bottoms out at 46px, so it can be as narrow as 98px — this is what keeps
+     the plate from spilling left under the Feedback column, whose sixth cell
+     (Kaleidoscope) IS occupied, unlike Seed's and Display's. */
+  width:min(var(--cc-exit-w), calc(2 * var(--cell) + var(--gap) - 8px));
+  height:var(--cc-exit-h);
   display:flex; align-items:center; justify-content:center;
-  padding:8px 10px;
-  border:1px solid rgba(0,0,0,.45);
+  padding:6px 8px;
+  /* The ring the control buttons wear. Theirs is painted into
+     blank-circle-red.png and greyed by `.g-controls .tint`, so the colour was
+     MEASURED rather than guessed: that art drawn through the same
+     `grayscale(1) brightness(1.06)` at this plate's size gives a ~5px band
+     running #303030 to #838383, averaging #505050. A solid 2px line at that
+     average carries the same weight as the soft ring. The drop-shadow is the
+     .cell one verbatim — everything else in the hud sits on that shadow, and
+     without it the plate reads as pasted on top of the console rather than as
+     part of it. */
+  border:2px solid #505050;
   border-radius:8px;
   background:#f2f2f2;
   color:#111;
   text-decoration:none;
   cursor:pointer;
+  filter:drop-shadow(0 2px 8px rgba(0,0,0,.65));
   transition:background .15s ease, border-color .15s ease;
 }
 @media (hover:hover) and (pointer:fine){
@@ -222,9 +237,11 @@ body{
 }
 #ccExit:focus-visible{outline:2px solid #fff; outline-offset:3px}
 #ccExit img{
-  /* cclogo.png is wide line art on transparent; 37px tall is what Pinballa
-     draws it at, so cap the height and let the aspect give the width. */
-  max-width:100%; max-height:37px;
+  /* cclogo.png is wide line art on transparent. It fills the content box and
+     `contain` keeps its aspect, so whichever of the two the plate runs out of
+     first is what sizes the mark — no second number to keep in step when the
+     plate is capped against a small hole. */
+  max-width:100%; max-height:100%;
   width:auto; height:auto;
   object-fit:contain;
   pointer-events:none;
@@ -234,7 +251,7 @@ body{
 #ccExit .cc-confirm{
   display:none;
   font-family:inherit;
-  font-size:15px; font-weight:700; letter-spacing:.06em;
+  font-size:17px; font-weight:700; letter-spacing:.06em;
   color:inherit;
 }
 #ccExit.confirming img{display:none}
@@ -548,19 +565,26 @@ body{
      The logo is what gives up width when three boxes won't fit (below). */
   #ccExit{
     position:static;
-    flex:0 0 auto;
+    /* Shrinkable here, unlike the console. Three fixed boxes do not fit a
+       320px phone, and of the two that CAN give, the logo giving first is the
+       worse trade — it is the only way to reach the knobs on a phone, so it
+       keeps a floor (below) and the plate yields to it. `contain` on the mark
+       means shrinking the plate just draws the logo smaller, not squashed. */
+    flex:0 1 auto;
+    min-width:72px;
   }
   /* Both boxes are "half the screen width" — #logo trimmed by half a 12px
      gap so it doesn't butt straight up against #console once both are
      flex items sharing #topBar's width instead of independently inset. */
   #logo{
     position:static;
-    /* Roughly half the screen, but SHRINKABLE — the controls block is a fixed
-       number of cells and the exit plate is a fixed size, so the logo is the
-       only one of the three that can give, and on a 320px phone it has to. */
+    /* Roughly half the screen, but shrinkable — the controls block is a fixed
+       number of cells, so something has to give on a narrow phone. The floor
+       is a touch target: this is the knob sheet's toggle, and it was collapsing
+       to 48x33 at 320px. Past that point the exit plate gives way instead. */
     flex:0 1 auto;
     width:calc(50vw - 56px);
-    min-width:0;
+    min-width:64px;
     cursor:pointer;
   }
   #console{ flex:0 0 auto }
@@ -757,19 +781,22 @@ if(!gl){
 /* Defaults are the instrument at rest: every optional effect sits at zero, and
    only the knobs the feedback loop cannot run without carry a working value.
    Those three exceptions are zoom (at 1.000 nothing recurses, so there is no
-   fractal at all), gain (an analog loop needs sub-unity gain or the sharpener
-   runs it up to white), and the seed (with nothing injected the loop starves
-   and fades to black). */
+   fractal at all), gain (an analog loop needs sub-unity gain, or anything
+   feeding it runs the frame up to white), and the seed (with nothing injected
+   the loop starves and fades to black). Sharpness used to be a fourth; it
+   opens at zero now, so the picture starts soft and regenerating detail is
+   something you turn on. */
 const P = {
   // camera — zoom drives the recursion; the rest are offsets, off at 0
   zoom:1.012, rot:0, panX:0, panY:0, warp:0,
-  // signal — trims rest at neutral (1.000 / 0), gain and sharpness excepted
-  bright:0, contrast:1.0, sat:1.0, hue:0, decay:0.9985, sharp:0.35,
+  // signal — trims rest at neutral (1.000 / 0), gain the only exception
+  bright:0, contrast:1.0, sat:1.0, hue:0, decay:0.9985, sharp:0,
   // feedback — all character, none of it on until asked for
   bleed:0, delayFrames:0, delayMix:0, edge:3,
   kaleido:0, mirrorX:0, invert:0,
-  // seed — shape/amount/size keep the loop alive; drift is an effect, off
-  seedShape:2, seedAmt:0.25, seedSize:0.045, seedDrift:0,
+  // seed — shape/amount/size keep the loop alive; drift is an effect, off.
+  // seedShape 1 is "dot" (see SHAPES) — the plainest thing to feed in.
+  seedShape:1, seedAmt:0.15, seedSize:0.045, seedDrift:0,
   // display — post effects off; iters and res are quality, not effects
   bloom:0, scan:0, iters:1, res:0.70
 };
