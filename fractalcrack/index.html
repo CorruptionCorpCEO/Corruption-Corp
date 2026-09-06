@@ -254,9 +254,18 @@ body{
 #ccExit .cc-confirm{
   display:none;
   font-family:inherit;
-  /* Scales with the plate like the mark it replaces, so the armed state is
-     the same weight in the same box at any --cell. */
-  font-size:clamp(14px, calc(var(--cc-exit-h) * 0.3), 34px);
+  /* Sized off the plate's WIDTH, because width is what constrains it — the old
+     0.3-of-the-HEIGHT ran "EXIT?" 157px wide inside a 115px content box, i.e.
+     21px over each edge, which is why it read as filling the button end to end.
+     Note that adding padding to THIS element could never have fixed that: it is
+     a centred flex item, so its own padding is invisible until the text
+     overflows, and by then it is already too late. The plate's 8.5% horizontal
+     padding was there the whole time.
+     Measured for CRENZO at letter-spacing .06em: "EXIT?" renders about 5.7x the
+     font size, and the content box is about 0.8x the plate width, so 0.11x
+     leaves the text at roughly 78% of the box with real space either side. Any
+     change to the face or the wording wants that ratio re-measured. */
+  font-size:clamp(11px, calc(var(--cc-exit-w) * 0.11), 24px);
   font-weight:700; letter-spacing:.06em;
   color:inherit;
 }

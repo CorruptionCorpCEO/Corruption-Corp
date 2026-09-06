@@ -1,4 +1,4 @@
-import{_ as d,a as m,b,c as u,d as _,e as f,f as w,g as y,h as v,i as k,j as P,k as x,l as S}from"./pinballa-cover-B6FL3X3S.js";const C=`// Fractal Crack "home page" content. Same format as Pinballa/MixPass's
+import{_ as d,a as m,b,c as u,d as _,e as f,f as w,g as y,h as v,i as k,j as P,k as x,l as S}from"./pinballa-cover-ch8n4kIw.js";const C=`// Fractal Crack "home page" content. Same format as Pinballa/MixPass's
 // page.txt: an [INFO] block of key - value lines, then a [DESCRIPTION] block
 // whose raw lines become the body (blank line = new paragraph). The \`app\`
 // field embeds the fractal-crack web app itself (a static HTML+JS toy hand-
