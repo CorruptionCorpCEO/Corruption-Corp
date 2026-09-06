@@ -107,13 +107,13 @@
   --console-w: calc(6 * var(--cell) + 5 * var(--gap));
   --console-h: calc(7 * var(--cell) + 6 * var(--gap));
   --hud-fade: .45s ease;
-  /* The CC exit plate's own footprint, so the console can clear it by name
-     rather than by a magic number that has to be re-derived every time the
-     plate changes size. This is the TARGET size — #ccExit also caps its width
-     against the hole it sits in, which is two cells wide and therefore as
-     narrow as 98px once --cell bottoms out at 46. */
-  --cc-exit-w: 96px;
-  --cc-exit-h: 62px;
+  /* The CC exit plate's own footprint. Its WIDTH is two knobs — the hole it
+     sits in is the Seed and Display columns, so this spans them exactly and
+     its edges line up with the grid above it. The height then follows from
+     the plate's 96:62 aspect, which is what it was drawn at; keep the ratio
+     if the width ever changes, or the CC mark stops filling the box. */
+  --cc-exit-w: calc(2 * var(--cell) + var(--gap));
+  --cc-exit-h: calc(var(--cc-exit-w) * 62 / 96);
 }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
 html,body{height:100%; overscroll-behavior:none}
@@ -206,14 +206,17 @@ body{
      plus the console's height, less the plate's own. */
   top:calc(16px + var(--console-h) - var(--cc-exit-h));
   right:18px;
-  /* Never wider than the hole. That block is 2 cells + a gap, and --cell
-     bottoms out at 46px, so it can be as narrow as 98px — this is what keeps
-     the plate from spilling left under the Feedback column, whose sixth cell
-     (Kaleidoscope) IS occupied, unlike Seed's and Display's. */
-  width:min(var(--cc-exit-w), calc(2 * var(--cell) + var(--gap) - 8px));
+  /* Exactly the hole: two cells plus the gap between them, so the plate's
+     left edge lands on the Seed column's and its right edge on Display's. It
+     therefore can't spill left under the Feedback column, whose sixth cell
+     (Kaleidoscope) IS occupied unlike Seed's and Display's. */
+  width:var(--cc-exit-w);
   height:var(--cc-exit-h);
   display:flex; align-items:center; justify-content:center;
-  padding:6px 8px;
+  /* Proportional, or the mark would run to the border on a big screen and
+     swim in space on a small one — the plate spans a knob pair, so it grows
+     with --cell across a 46-88px range. */
+  padding:calc(var(--cc-exit-h) * 0.1) calc(var(--cc-exit-w) * 0.085);
   /* The ring the control buttons wear. Theirs is painted into
      blank-circle-red.png and greyed by `.g-controls .tint`, so the colour was
      MEASURED rather than guessed: that art drawn through the same
@@ -251,7 +254,10 @@ body{
 #ccExit .cc-confirm{
   display:none;
   font-family:inherit;
-  font-size:17px; font-weight:700; letter-spacing:.06em;
+  /* Scales with the plate like the mark it replaces, so the armed state is
+     the same weight in the same box at any --cell. */
+  font-size:clamp(14px, calc(var(--cc-exit-h) * 0.3), 34px);
+  font-weight:700; letter-spacing:.06em;
   color:inherit;
 }
 #ccExit.confirming img{display:none}
@@ -536,10 +542,11 @@ body{
    Landscape (including landscape phones/tablets) is untouched — everything
    below is scoped to portrait so "when horizontal, maintain the current hud"
    holds exactly. Layout, not behaviour: the same GROUPS/cells/knobs render
-   here, just reflowed — Controls (play/reset/inject/random/upload) stays a
-   permanent top-right strip, and Camera/Signal/Feedback/Seed/Display move
-   into a slide-up sheet toggled by tapping the logo, so the fractal itself
-   keeps most of a narrow screen by default. */
+   here, just reflowed — Controls (play/reset/inject/random/upload) is a
+   permanent vertical strip down the LEFT edge under the logo, and
+   Camera/Signal/Feedback/Seed/Display move into a slide-up sheet toggled by
+   tapping the logo, so the fractal itself keeps most of a narrow screen by
+   default. */
 @media (max-width:900px) and (orientation:portrait){
   /* #topBar becomes a real flex row here (it's display:contents everywhere
      else — see the base rule) spanning the same left:20px/right:18px inset
@@ -550,70 +557,67 @@ body{
      of icons), so lining up their TOPS the way independent absolute
      positioning did left them visually unbalanced. Centering them against
      each other reads as one coherent row instead. */
+  /* #topBar becomes a real flex row here (it's display:contents everywhere
+     else — see the base rule) spanning the same left:20px/right:18px inset
+     its children used to carry independently, so they still start and end in
+     the same places. It WRAPS: the logo and the exit plate share the first
+     line, and the controls strip takes a line of its own underneath, which is
+     what puts it "just below the logo" without anything having to measure the
+     logo's height (it scales with its own aspect ratio, so that height is not
+     a number anything else can know). The one gap does both axes, so the
+     spacing above the strip is the same as the one beside the logo. */
   #topBar{
     display:flex;
+    flex-wrap:wrap;
     align-items:center;
     justify-content:space-between;
     gap:10px;
     position:absolute;
     top:16px; left:20px; right:18px;
   }
-  /* The exit plate joins the row as a flex item instead of positioning itself.
-     It is LAST in the markup, so that puts it at the right-hand end — the same
-     corner it takes on every other viewport — and it keeps its full size,
-     because the whole point is that it reads as the same button Pinballa has.
-     The logo is what gives up width when three boxes won't fit (below). */
+  /* Line 1, right-hand end. The plate is LAST in the markup, which is what
+     puts it there — but the controls sit BETWEEN them in the DOM, so `order`
+     is what pulls it back up onto the logo's line. */
   #ccExit{
     position:static;
-    /* Shrinkable here, unlike the console. Three fixed boxes do not fit a
-       320px phone, and of the two that CAN give, the logo giving first is the
-       worse trade — it is the only way to reach the knobs on a phone, so it
+    order:2;
+    /* Shrinkable, unlike the console. Two fixed boxes plus a logo do not fit
+       a 320px phone, and of the two that CAN give, the logo giving first is
+       the worse trade — it is the only way to reach the knobs here, so it
        keeps a floor (below) and the plate yields to it. `contain` on the mark
        means shrinking the plate just draws the logo smaller, not squashed. */
     flex:0 1 auto;
     min-width:72px;
   }
-  /* Both boxes are "half the screen width" — #logo trimmed by half a 12px
-     gap so it doesn't butt straight up against #console once both are
-     flex items sharing #topBar's width instead of independently inset. */
+  /* Line 1, left. Roomier than it used to be: the controls have moved off
+     this line, so the logo only shares it with the plate. The min-width is a
+     touch target — this is the knob sheet's toggle, and it was collapsing to
+     48x33 at 320px; past that point the exit plate gives way instead. */
   #logo{
     position:static;
-    /* Roughly half the screen, but shrinkable — the controls block is a fixed
-       number of cells, so something has to give on a narrow phone. The floor
-       is a touch target: this is the knob sheet's toggle, and it was collapsing
-       to 48x33 at 320px. Past that point the exit plate gives way instead. */
+    order:1;
     flex:0 1 auto;
-    width:calc(50vw - 56px);
+    width:calc(50vw - 25px);
     min-width:64px;
     cursor:pointer;
   }
-  #console{ flex:0 0 auto }
-  /* No forced width here any more — #controlsBar is only 3 cells wide now
-     (see below), so #console just shrink-wraps around it; #topBar's
-     justify-content:space-between keeps it flush against the right edge
-     instead of the right:18px it used to carry on its own. */
+  /* Line 2, on its own: a 100% basis is what forces the wrap, so the strip
+     always starts a new line however wide the logo and plate end up. */
   #console{
     position:static;
+    order:3;
+    flex:0 0 100%;
   }
-  /* Controls: two rows instead of a scrolling strip — 3 across the top,
-     Play + Reset on their own row underneath, both rows flush right. The
-     width is sized for exactly 3 cells (a 4th would still fit the half-
-     screen box from #logo, which would wrap it 4-and-1 instead); nth-child
-     reorders Play/Reset after Inject/Random/Upload without touching the
-     DOM, which is what the desktop column still reads top-to-bottom. */
+  /* Controls: ONE vertical column down the left edge, in DOM order
+     (play, reset, inject, random, upload) — the same order the desktop column
+     reads top to bottom, so no nth-child reshuffling any more. */
   #controlsBar{
     --cell: 36px;
     background:transparent;
-    flex-direction:row;
-    flex-wrap:wrap;
-    justify-content:flex-end;
-    width:calc(3 * var(--cell) + 2 * var(--gap) + 4px);
+    flex-direction:column;
+    align-items:flex-start;
+    width:auto;
   }
-  #controlsBar .cell:nth-child(1){ order:4 }   /* play  -> row 2 */
-  #controlsBar .cell:nth-child(2){ order:5 }   /* reset -> row 2 */
-  #controlsBar .cell:nth-child(3){ order:1 }   /* inject */
-  #controlsBar .cell:nth-child(4){ order:2 }   /* random */
-  #controlsBar .cell:nth-child(5){ order:3 }   /* upload */
   /* Knobs: a bottom sheet, fixed to the viewport regardless of where it sits
      in the DOM (no ancestor here has a transform, so position:fixed anchors
      to the real viewport). Hidden below the fold by default; .knobs-open
@@ -2042,9 +2046,12 @@ let photoMode = false;
 let photoHintTimer = null;
 
 function showPhotoHint(){
-  /* Escape is the way out. A phone has no Escape key, so a coarse pointer is
-     told about the fallback instead — both are wired either way. */
-  photoHint.textContent = COARSE ? "double-tap to exit" : "press escape to exit";
+  /* BACKSPACE, not Escape. Escape is spoken for: the Display header toggles
+     real fullscreen, and there the browser takes Escape for itself before any
+     page sees it — so the one key photo mode most needs is the one it cannot
+     have. A phone has no Backspace key either, so a coarse pointer is told
+     about the fallback instead; both are wired whatever the device. */
+  photoHint.textContent = COARSE ? "double-tap to exit" : "press backspace to exit";
   photoHint.classList.add("show");
   clearTimeout(photoHintTimer);
   photoHintTimer = setTimeout(() => photoHint.classList.remove("show"), PHOTO_HINT_MS);
@@ -2054,7 +2061,7 @@ function enterPhoto(){
   photoMode = true;
   select(null);                       // nothing left locked behind the curtain
   /* The camera button still holds focus from the click that got here, and the
-     key handler below reads off document.body — without this the first Escape
+     key handler below reads off document.body — without this the first press
      is spent on the button instead of on photo mode. */
   if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
   hud.classList.add("idle");
@@ -2169,9 +2176,15 @@ logo.addEventListener("keydown", e => {
 /*  Keys & resize                                                      */
 /* ------------------------------------------------------------------ */
 window.addEventListener("keydown", e => {
-  // Checked before the focus guard below: photo mode has no visible control to
-  // put focus on, so it must answer Escape wherever focus happens to be.
-  if(photoMode && e.key === "Escape"){ e.preventDefault(); exitPhoto(); return; }
+  /* Checked before the focus guard below: photo mode has no visible control to
+     put focus on, so it must answer wherever focus happens to be — the hud is
+     invisible but its buttons are still tabbable. The one exception is the
+     legend's value box, where Backspace is what deletes a digit.
+     preventDefault also covers the browsers that still treat a bare Backspace
+     as "go back". */
+  if(photoMode && e.key === "Backspace" && e.target !== lgValueInput){
+    e.preventDefault(); exitPhoto(); return;
+  }
   if(e.target !== document.body) return;
   if(e.code === "Space"){ e.preventDefault(); setPlaying(!playing); }
   else if(e.key === "r" || e.key === "R") doAction("reset");
