@@ -2,20 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <!-- The app owns zoom itself (pinch and double-tap-hold drive the editor's
-         own zoomLevel — see script.js), so the BROWSER's pinch-zoom and
-         double-tap-to-zoom must stay out of it: left on, they fight the
-         gesture and leave the page scaled with the board half off-screen. -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <!-- Page name is deliberately just "Pinballa" (matches the site's own
-         "Corruption Corp"). The longer pitch lives in the description/OG tags
-         below, where search results and link previews use it. -->
     <title>Pinballa</title>
-    <!-- This app is served at BOTH /pinball/index.html (build output) and
-         /pinballa/ (its public route — the build copies this file there; see
-         the route plugin in the site's vite.config.js). The canonical points at
-         /pinballa so search engines index one URL, and robots.txt disallows
-         /pinball/ so the duplicate never competes with it. -->
     <meta
       name="description"
       content="Pinballa is a free browser pinball construction kit: draw walls, drop in bumpers and flippers, then play your table and publish it to the arcade."
@@ -51,16 +39,7 @@
         "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
       }
     </script>
-    <!-- Root-absolute so it survives both dev (served at /) and the
-         build:site --base=/pinball/ rebase, which prefixes root paths in
-         this file automatically (see /ui/*.png references above). -->
     <link rel="icon" type="image/png" href="/pinball/favicon.png">
-    <!-- Pinballa installs as its own app (its own manifest, its own icon,
-         locked to portrait). Installed there is no browser chrome to retract,
-         so the viewport is genuinely constant — the board never re-derives its
-         size mid-play. The manifest and icons are served from the SITE's root
-         (same origin), which is also where the service worker that makes it
-         installable lives. -->
     <link rel="manifest" href="/pinballa.webmanifest">
     <link rel="apple-touch-icon" href="/icons/pinballa-any-180.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -113,8 +92,8 @@
             to { transform: rotate(360deg); }
         }
     </style>
-  <script type="module" crossorigin src="/pinball/assets/index-Cs9edGeO.js"></script>
-  <link rel="stylesheet" crossorigin href="/pinball/assets/index-CdoiwQJC.css">
+  <script type="module" crossorigin src="/pinball/assets/index-CR7WQcjn.js"></script>
+  <link rel="stylesheet" crossorigin href="/pinball/assets/index-JRM8xRmX.css">
 </head>
 <body>
     <div id="pinballa-splash" role="status" aria-label="Loading">
@@ -129,22 +108,11 @@
             if (s) s.classList.add('splash-hide');
         }, 8000);
     </script>
-    <!-- Profile Modal (Popup) -->
     <div id="profile-modal" class="modal-backdrop">
         <div id="profile-container" class="panel profile-panel">
             <button id="btn-close-profile" class="btn-close" aria-label="Close"><img src="/pinball/ui/pinballa-exit.png" alt="" draggable="false"></button>
-            <!-- The panel itself must never clip (the close chip straddles its
-                 corner), so the phone-height scroll lives on this wrapper. -->
             <div class="panel-scroll">
             <h3 class="panel-heading">Profile</h3>
-            <!-- Accounts live on the Corruption Corp site (one shared account).
-                 Login/registration and profile editing both open the site's
-                 account panel (/account) in a new tab — same origin + Firebase
-                 project, so signing in there signs this tab in live. -->
-            <!-- Cohesive layout: one identity CARD up top (avatar + name +
-                 logout, stats strip under a hairline), then uniform
-                 panel-sections — Description, account actions, and the
-                 collapsibles — each separated by the same hairline rule. -->
             <div id="auth-unlogged">
                 <div id="auth-prompt" class="auth-prompt"></div>
                 <div class="profile-card">
@@ -153,8 +121,6 @@
                 </div>
             </div>
             <div id="auth-logged">
-                <!-- User info (green): avatar, name, square Edit Profile, stats.
-                     Collapsible like the other sections. -->
                 <div class="panel-section profile-opt accent-green">
                     <button type="button" id="btn-dd-userinfo" class="dd-plain-header" data-tilt aria-expanded="false" aria-controls="user-info-body">
                         User info <span class="dd-plain-arrow">&#9662;</span>
@@ -167,24 +133,16 @@
                         </div>
                         <button id="btn-edit-profile" class="btn btn-secondary btn-icon" aria-label="Edit profile" title="Edit profile"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4H6a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M17.5 3.5l3 3-6.7 6.7-3.4.4.4-3.4 6.7-6.7z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></button>
                     </div>
-                    <!-- Account stats: joined date comes from the auth user's
-                         metadata; the top-10 count is fetched when the modal
-                         opens (script.js: refreshTop10Stat). -->
                     <div id="profile-stats">
                         <div class="profile-stat"><span class="profile-stat-label">Joined</span><span class="profile-stat-value" id="stat-joined">&mdash;</span></div>
                         <div class="profile-stat"><span class="profile-stat-label">Top 10s</span><span class="profile-stat-value" id="stat-top10">&mdash;</span></div>
                     </div>
-                    <!-- Name colour: 7 palette swatches, applied to the profile
-                         name + leaderboard rows. Built in script.js. -->
                     <div class="name-color-block">
                         <span class="field-label">Name colour</span>
                         <div id="name-swatches" class="name-swatches"></div>
                     </div>
-                    </div><!-- /#user-info-body -->
-                </div>
+                    </div></div>
 
-                <!-- Machines this player has upvoted in the arcade (script.js:
-                     renderMyUpvoted, filled when the modal opens). -->
                 <div class="panel-section profile-opt accent-pink">
                     <button type="button" id="btn-dd-upvoted" class="dd-plain-header" data-tilt aria-expanded="false" aria-controls="my-upvoted-body">
                         Your upvoted machines <span class="dd-plain-arrow">&#9662;</span>
@@ -196,8 +154,6 @@
             </div>
 
 
-            <!-- Site Settings collapses (the always-open background controls
-                 made the modal too tall). -->
             <div class="panel-section profile-opt accent-yellow">
                 <button type="button" id="btn-dd-site" class="dd-plain-header" data-tilt aria-expanded="false" aria-controls="site-settings-body">
                     Site Settings <span class="dd-plain-arrow">&#9662;</span>
@@ -243,16 +199,10 @@
                     <button id="btn-open-guide-profile" class="btn btn-secondary btn-icon" aria-label="Open guide" title="Guide"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v15H7a2 2 0 0 0-2 2V4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M5 19a2 2 0 0 1 2-2h12" fill="none" stroke="currentColor" stroke-width="2"/></svg></button>
                     <button id="btn-logout" class="btn btn-danger btn-small">Logout</button>
                 </div>
-                </div><!-- /#site-settings-body -->
-            </div>
-            </div><!-- /.panel-scroll -->
-        </div>
+                </div></div>
+            </div></div>
     </div>
 
-    <!-- Welcome / tutorial (first visit) — shown once the boot splash clears
-         unless the visitor ticked "don't display again" (script.js,
-         localStorage: pinballa_welcome_seen). GUIDE swaps the box for the
-         full how-to; BACK returns to the box. -->
     <div id="welcome-modal" class="modal-backdrop">
         <div class="panel welcome-panel">
             <button id="btn-close-welcome" class="btn-close" aria-label="Close"><img src="/pinball/ui/pinballa-exit.png" alt="" draggable="false"></button>
@@ -275,11 +225,6 @@
             <div id="welcome-guide">
                 <h3 class="panel-heading">How it works</h3>
                 <div class="guide-scroll">
-                  <!-- MOUSE + KEYBOARD version. The touch one below covers the
-                       same ground for the phone layout — a rail instead of side
-                       panels, gestures instead of shortcuts. CSS shows exactly
-                       one of the two (see .guide-body in style.css); edit them
-                       together, they describe the same app. -->
                   <div class="guide-body guide-body--desktop">
                     <h4 class="panel-subheading">The editor</h4>
                     <p class="guide-note">The board is always live — the ball, flippers and plunger
@@ -360,9 +305,7 @@
                        (the camera rides with the ball) — exit either with the &times;. Lose all three
                        balls and the high scores come up; on a published machine your best score
                        posts to its leaderboard automatically while you're signed in.</p></div>
-                  </div><!-- /.guide-body--desktop -->
-
-                  <div class="guide-body guide-body--touch">
+                  </div><div class="guide-body guide-body--touch">
                     <h4 class="panel-subheading">The editor</h4>
                     <p class="guide-note">The board is always live — the ball, flippers and plunger
                        work while you build, so test as you go. Tap the <strong>Pinballa logo</strong>
@@ -468,8 +411,7 @@
                        <strong>circles</strong> (hold <kbd>C</kbd> and drag out from the centre), and
                        adding one more piece to a selection (<kbd>Shift</kbd>-click) — on a phone,
                        box-select around them instead. Everything else is here.</p>
-                  </div><!-- /.guide-body--touch -->
-                </div>
+                  </div></div>
                 <button id="btn-guide-back" class="btn btn-secondary">BACK</button>
             </div>
         </div>
@@ -477,25 +419,11 @@
 
     <div id="app-container">
         <div id="left-column">
-            <!-- Two images, not a src swap. A GIF <img> restarts its animation
-                 from frame 1 the instant its src is set again — even to the
-                 SAME url — so a naive toggle re-lit the wordmark from scratch
-                 every time. Once armed, the lit copy stays mounted and just
-                 keeps playing behind the still one; toggling only moves which
-                 layer is on top (see the click handler in script.js), so
-                 turning it back on resumes exactly where the animation was. -->
             <div id="logo-rectangle">
                 <img id="logo-still" src="/pinball/ui/pinballa-logo.png" alt="Pinballa" draggable="false">
             </div>
 
             <div id="editor-panel">
-            <!-- Tool / component buttons are 3D shiny white "chips" (see the
-                 .chip rules in style.css + initChips() in script.js): the disc
-                 tilts toward the cursor, the art extrudes off its front face,
-                 and a click flips it 360deg. Structure per chip:
-                   button.chip > .chip-tilt > .chip-flip > (.chip-face + img.chip-art)
-                 The button keeps its id + click handler; the chip is purely
-                 visual and additive. -->
             <div class="editor-section">
                 <h3>Tools</h3>
                 <div class="editor-grid">
@@ -518,8 +446,6 @@
                     <button id="btn-boss" class="chip" data-chip aria-label="Boss"><span class="chip-tilt"><span class="chip-flip"><span class="chip-face"></span><img class="chip-art" src="/pinball/tools/boss.png" alt="Boss"></span></span></button>
                 </div>
             </div>
-            <!-- Mobile hides this whole section: the two modes are promoted to
-                 the persistent #mobile-modebar across the top of the screen. -->
             <div class="editor-section" id="gamemodes-section">
                 <h3>Gamemodes</h3>
                 <button id="btn-classic" class="banner-btn banner-full" data-tilt><img src="/pinball/ui/classic_icon.png" alt="Classic"></button>
@@ -532,10 +458,6 @@
 
         <button id="btn-exit-fantasies" class="mode-exit-btn" aria-label="Exit Fantasies"><img src="/pinball/ui/pinballa-exit.png" alt="" draggable="false"></button>
         <button id="btn-exit-classic" class="mode-exit-btn" aria-label="Exit Classic"><img src="/pinball/ui/pinballa-exit.png" alt="" draggable="false"></button>
-        <!-- TV filters (classic/fantasies): CRT + mosaic strengths, and the
-             classic-only board-angle tilt. Wired in script.js (tvSettings).
-             The X/TV buttons pin to the scoreboard's top corners (JS:
-             positionModeButtons) — no data-tilt so their rotate isn't hijacked. -->
         <button id="btn-tv" class="mode-exit-btn" aria-label="TV filters">TV</button>
         <div id="tv-panel">
             <div class="tv-row"><span class="slider-label">CRT: <span id="tv-crt-val">0</span>%</span><input type="range" id="tv-crt" min="0" max="100" value="0"></div>
@@ -553,9 +475,6 @@
         </svg>
         <div id="game-area">
             <div id="game-wrapper">
-                <!-- Mobile-only bar above the scoreboard: the logo shows/hides
-                     the docked tool rail, the hamburger opens the right
-                     (settings) drawer. Hidden on desktop and in play modes. -->
                 <div id="mobile-topbar">
                     <button type="button" id="mobile-logo-btn" aria-label="Show or hide the tools">
                         <img src="/pinball/ui/pinballa-logo.png" alt="Pinballa" draggable="false">
@@ -567,17 +486,6 @@
                 <div id="score-container">
                     <div id="score-display"></div>
                 </div>
-                <!-- Mobile only: the two game modes as long full-width bars
-                     between the scoreboard and the board, shown and hidden by
-                     the same logo press that shows the tool rail beside the
-                     board (body.rail-open).
-
-                     These are PROXIES: the real buttons keep their ids, their
-                     chip/tilt wiring and every handler in #gamemodes-section,
-                     and these just forward the click. Relocating the originals
-                     between the two layouts would mean moving live nodes on
-                     every resize; a forwarded click cannot fall out of sync
-                     with them. -->
                 <div id="mobile-modebar">
                     <button type="button" class="modebar-btn" data-proxy="btn-classic" aria-label="Classic">
                         <img src="/pinball/ui/classic_icon.png" alt="Classic" draggable="false">
@@ -587,13 +495,8 @@
                     </button>
                 </div>
                 <div id="game-container">
-                    <!-- Screen-space effects target: the mosaic filter applies
-                         to THIS layer, so its blocks read straight-on however
-                         the board inside is 3D-tilted (filtering #game-inner
-                         itself would perspective-warp the pixels). -->
                     <div id="tv-filter-layer">
                     <div id="game-inner">
-                        <!-- Images should be placed in the public/ directory -->
                         <img src="/pinball/board/board.png" id="board" alt="Pinball Board" draggable="false">
                         <canvas id="walls-canvas"></canvas>
                         <canvas id="glow-canvas" style="position:absolute; top:0; left:0; width:100%; height:100%; z-index: 14; pointer-events:none;"></canvas>
@@ -602,30 +505,15 @@
                         <img src="/pinball/board/flipper_left.png" id="flipper-left" class="flipper" alt="Left Flipper" draggable="false">
                         <img src="/pinball/board/flipper_right.png" id="flipper-right" class="flipper" alt="Right Flipper" draggable="false">
                         <img src="/pinball/board/plunger.png" id="plunger" alt="Plunger" draggable="false">
-                        <!-- #ball-pos is a full-size transparent layer that
-                             carries the ball's POSITION as a transform; #ball
-                             itself keeps its size, skin and the .held lift.
-                             Splitting them is what lets the position be a pure
-                             compositor transform (see renderGame) while the
-                             lift keeps its own eased transform + transition —
-                             one element could not do both. -->
                         <div id="ball-pos"><div id="ball"></div></div>
                         <img id="overlay-skin" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; z-index:10; pointer-events:none; object-fit: fill;" draggable="false">
                     </div>
-                    </div><!-- /#tv-filter-layer -->
-                    <!-- CRT scanline/vignette layer (TV panel); opacity is the
-                         strength, shown only in play modes (CSS gate). -->
-                    <div id="crt-overlay" aria-hidden="true"></div>
+                    </div><div id="crt-overlay" aria-hidden="true"></div>
 
                     <button id="btn-fantasies-start" class="btn btn-primary" style="display: none;" data-tilt>PLAY</button>
-                    <!-- Leaderboard Overlay — site chrome (black panel, white
-                         hairlines, offset shadow), like the rest of the app. -->
                     <div id="leaderboard-overlay" style="display:none;">
                         <h2>HIGH SCORES</h2>
                         <div id="leaderboard-list"></div>
-                        <!-- Scores are profile-linked: posted automatically
-                             under the signed-in account (no initials), or an
-                             invite to log in. -->
                         <div id="score-entry" style="display:none;">
                             <p>YOUR SCORE: <span id="final-score-display"></span></p>
                             <p id="score-entry-note"></p>
@@ -634,11 +522,6 @@
                         <button id="btn-reset-game" class="btn btn-primary">PLAY AGAIN</button>
                     </div>
                 </div>
-                <!-- Mobile-only physical controls under the board: hold ◀ / ▶
-                     for the flippers, hold LAUNCH to charge the plunger and
-                     release to fire. They drive the same keys the keyboard
-                     uses, so playing never has to touch the board itself
-                     (board touches belong to the editor's tools). -->
                 <div id="mobile-controls">
                     <button type="button" id="mc-flip-left" aria-label="Left flipper">&#9664;</button>
                     <button type="button" id="mc-plunger" aria-label="Plunger">LAUNCH</button>
@@ -648,9 +531,6 @@
         </div>
         <div id="right-column">
             <div id="settings-panel">
-                <!-- Arcade, Shop, Cosmetics & Save scroll together inside this
-                     black container; the profile footer below is PINNED (it sits
-                     outside .settings-scroll so it stays put while this scrolls). -->
                 <div class="settings-scroll">
                 <button id="btn-open-arcade-public" class="banner-btn" data-tilt>
                     <img src="/pinball/ui/arcade_icon.png" alt="Arcade">
@@ -659,8 +539,6 @@
                     <img src="/pinball/ui/machine_shop_icon.png" alt="Machine Shop">
                 </button>
 
-                <!-- Cosmetics & Save are collapsible dropdowns; their headers are
-                     banner buttons styled like the Arcade / Machine Shop ones. -->
                 <div class="menu-dropdown" id="dd-cosmetics">
                     <button type="button" class="banner-btn dd-header" id="btn-dd-cosmetics" data-tilt
                             aria-expanded="false" aria-controls="skins-container">
@@ -679,8 +557,6 @@
                             <span>Default wall</span>
                         </div>
                         <p class="section-hint">The board's built-in wall art.</p>
-                        <!-- Hidden state-holders: the eye buttons above drive these
-                             (checked = that layer hidden), reused by save/load. -->
                         <input type="checkbox" id="toggle-drawn-components" hidden>
                         <input type="checkbox" id="toggle-main-wall" hidden>
                     </div>
@@ -742,18 +618,14 @@
                             </div>
                         </div>
                     </div>
-                    </div><!-- /#skins-body -->
-
-                    <button type="button" id="btn-dd-sounds" class="cosmetics-sub" data-tilt aria-expanded="false" aria-controls="sounds-body">
+                    </div><button type="button" id="btn-dd-sounds" class="cosmetics-sub" data-tilt aria-expanded="false" aria-controls="sounds-body">
                         Sounds <span class="cosmetics-sub-arrow">&#9662;</span>
                     </button>
                     <div id="sounds-body" class="cosmetics-sub-body">
                     <p class="section-hint">Replace any sound effect — or the music — with your own audio.</p>
                     <div id="sounds-list-container">
-                        <!-- Generated dynamically by script.js -->
-                    </div>
-                    </div><!-- /#sounds-body -->
-                </div>
+                        </div>
+                    </div></div>
                     </div>
                 </div>
 
@@ -772,31 +644,12 @@
                             <p class="section-hint">Saves to your Machine Shop on this device.</p>
                             <button id="btn-publish-machine" class="btn btn-secondary">Publish</button>
                             <p class="section-hint">Puts it in the public Arcade for everyone to play.</p>
-                            <!-- Publish size feedback (script.js): "compressed to fit"
-                                 or a "too large" message. Hidden until it has text. -->
                             <p id="publish-note" class="section-hint publish-note" style="display:none;"></p>
                         </div>
                     </div>
                 </div>
 
-                </div><!-- /.settings-scroll -->
-
-                <!-- Profile — PINNED footer: stays put while the panel scrolls.
-                     Shows a signed-in card or a login prompt (auth state, JS),
-                     sharing the row 60/40 with the way back to the Corruption
-                     Corp site (the card carries two lines now — see the CSS). That link is NOT optional chrome:
-                     Pinballa opens in the same tab now (the Programs menu
-                     navigates rather than window.open-ing), so this is the only
-                     way home — which is why it sits outside the auth switch and
-                     shows in both states. -->
-                <div id="panel-profile">
-                    <!-- One line: the avatar and the name side by side, and the
-                         same height (see --pp-line). It used to carry a "View
-                         profile" caption under them; the button is the avatar
-                         and the name now, and `title` still says what it does.
-                         The name sits in its own CLIP box because a name too
-                         long for the card marquees inside it, and the thing
-                         that slides can't also be the thing that clips. -->
+                </div><div id="panel-profile">
                     <button type="button" id="panel-profile-card" title="View your profile" data-tilt>
                         <span class="panel-profile-id">
                             <img id="panel-profile-pic" alt="">
@@ -807,10 +660,6 @@
                         <span class="panel-profile-login-title">Not signed in</span>
                         <span class="panel-profile-login-sub">Log in or register to save, publish &amp; add custom skins</span>
                     </button>
-                    <!-- Two-step: the first press swaps the mark for EXIT?,
-                         the second follows the link. Leaving is a one-way trip
-                         out of the app and this sits right beside the profile
-                         card, so it is easy to hit by accident on a phone. -->
                     <a id="panel-profile-home" href="/" title="Back to Corruption Corp" aria-label="Back to Corruption Corp" data-tilt>
                         <img src="/pinball/ui/cclogo.png" alt="Corruption Corp" draggable="false">
                         <span class="ph-confirm" aria-hidden="true">EXIT?</span>
@@ -828,22 +677,12 @@
                     <button id="btn-close-arcade" class="btn-close btn-close-inline" aria-label="Close"><img src="/pinball/ui/pinballa-exit.png" alt="" draggable="false"></button>
                 </div>
             </div>
-            <!-- Sort filter — only shown for the PUBLIC arcade (script.js).
-                 New = newest, Popular = most-played (leaderboard entries),
-                 Most Liked = highest net upvotes. -->
             <div id="arcade-filter" class="arcade-filter" style="display:none;">
                 <button type="button" class="arcade-filter-btn active" data-sort="new">New</button>
                 <button type="button" class="arcade-filter-btn" data-sort="popular">Popular</button>
                 <button type="button" class="arcade-filter-btn" data-sort="liked">Most Liked</button>
             </div>
             <div id="arcade-list"></div>
-            <!-- Floating action, pinned to the window's bottom-right corner
-                 (see .arcade-modal-content). It is the bare create-machine ICON
-                 now — no .btn/.btn-primary plate behind it — where it used to be
-                 a two-line "Create / New Machine" label, so the title attribute
-                 and aria-label are what carry the wording. #arcade-list reserves
-                 room under the grid so the last row never sits behind it,
-                 computed from this button's own size — see --nm-* in style.css. -->
             <button id="btn-new-machine"
                     aria-label="Create new machine" title="Create New Machine">
                 <img src="/pinball/ui/create-machine-icon.png" alt="" draggable="false">
@@ -852,11 +691,8 @@
     </div>
 
     <div id="arcade-detail-modal">
-        <!-- Close chip lives OUT here, on the modal itself: .arcade-detail-content
-             is `overflow: hidden` and would slice the corner-straddling X. -->
         <button id="btn-close-detail" class="btn-close" aria-label="Close"><img src="/pinball/ui/pinballa-exit.png" alt="" draggable="false"></button>
         <div class="arcade-detail-content">
-            <!-- Mode Selection Overlay -->
             <div id="mode-selection-overlay">
                 <div class="mode-select-row">
                     <button id="btn-mode-classic" class="banner-btn banner-full"><img src="/pinball/ui/classic_icon.png" alt="Classic"></button>
@@ -877,9 +713,6 @@
                     <span id="detail-author-name">Anonymous</span>
                 </div>
                 <div id="detail-published-status">Published</div>
-                <!-- Up/down votes — shown only for public arcade machines
-                     (script.js). Clicking a button casts / toggles the signed-in
-                     player's vote; the score is the net (up − down). -->
                 <div id="detail-votes" class="detail-votes" style="display:none;">
                     <button id="btn-upvote" class="vote-btn" type="button" aria-label="Upvote">&#9650;</button>
                     <span id="vote-score" class="vote-score">0</span>
@@ -887,9 +720,6 @@
                 </div>
                 <div class="detail-scroll">
                     <p id="detail-desc">Description goes here...</p>
-                    <!-- Top 10 leaderboard for public machines (script.js:
-                         loadDetailLeaderboard). The entry count is the machine's
-                         play count. -->
                     <div id="detail-leaderboard" class="detail-leaderboard" style="display:none;">
                         <div class="detail-lb-head">
                             <h3 class="detail-lb-title">High Scores</h3>
@@ -900,10 +730,6 @@
                 </div>
                 <div class="arcade-detail-actions">
                     <button id="btn-detail-play" class="btn btn-primary">PLAY</button>
-                    <!-- Published machines you wrote: edit straight from the
-                         arcade. Shown by script.js only for your own, and only
-                         when the shop copy is NOT what you are looking at (a
-                         shop copy's own PLAY button already says EDIT). -->
                     <button id="btn-detail-edit" class="btn btn-secondary">EDIT</button>
                     <button id="btn-detail-delete" class="btn btn-danger">DELETE</button>
                 </div>
@@ -911,14 +737,9 @@
         </div>
     </div>
 
-    <!-- Public player profile — opened by clicking a machine author in the
-         arcade detail view (script.js: openPublicProfile). Shows the player's
-         published machines and the machines they've upvoted. -->
     <div id="public-profile-modal" class="modal-backdrop">
         <div class="panel public-profile-panel">
             <button id="btn-close-public-profile" class="btn-close" aria-label="Close"><img src="/pinball/ui/pinballa-exit.png" alt="" draggable="false"></button>
-            <!-- Scroll on the wrapper, not the panel — the panel must not clip
-                 the corner-straddling close chip. -->
             <div class="panel-scroll">
             <div class="pp-head">
                 <img id="pp-avatar" class="pp-avatar" alt="">
@@ -932,8 +753,7 @@
                 <h4 class="panel-subheading">Upvoted machines</h4>
                 <div id="pp-upvoted" class="pp-grid"></div>
             </div>
-            </div><!-- /.panel-scroll -->
-        </div>
+            </div></div>
     </div>
 
 </body>
