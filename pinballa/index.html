@@ -92,8 +92,8 @@
             to { transform: rotate(360deg); }
         }
     </style>
-  <script type="module" crossorigin src="/pinball/assets/index-Da8BbKaR.js"></script>
-  <link rel="stylesheet" crossorigin href="/pinball/assets/index-BtPrixSd.css">
+  <script type="module" crossorigin src="/pinball/assets/index-z39S6rcx.js"></script>
+  <link rel="stylesheet" crossorigin href="/pinball/assets/index-DYAx_bVJ.css">
 </head>
 <body>
     <div id="pinballa-splash" role="status" aria-label="Loading">
@@ -195,22 +195,24 @@
                 </div>
 
                 <div id="admin-colors" hidden>
-                    <div class="ss-cat">Machine colours (admin)</div>
+                    <div class="ss-cat">Colours (admin testing)</div>
                     <div class="ss-color-grid">
                         <label class="ss-color"><input type="color" data-color-key="wall"><span>Walls</span></label>
                         <label class="ss-color"><input type="color" data-color-key="bumper"><span>Bumper</span></label>
                         <label class="ss-color"><input type="color" data-color-key="point"><span>Point</span></label>
                         <label class="ss-color"><input type="color" data-color-key="grabber"><span>Grabber</span></label>
                         <label class="ss-color"><input type="color" data-color-key="boss"><span>Boss</span></label>
+                        <label class="ss-color"><input type="color" data-color-key="mirrorGrid"><span>Mirror/Grid</span></label>
+                        <label class="ss-color"><input type="color" data-color-key="undoRedo"><span>Undo/Redo</span></label>
                         <label class="ss-color ss-tint"><input type="color" data-color-key="flipper"><span>Flippers</span><button type="button" class="ss-color-clear" data-clear-key="flipper" title="Stock art (no tint)">&times;</button></label>
                         <label class="ss-color ss-tint"><input type="color" data-color-key="plunger"><span>Plunger</span><button type="button" class="ss-color-clear" data-clear-key="plunger" title="Stock art (no tint)">&times;</button></label>
                         <label class="ss-color ss-tint"><input type="color" data-color-key="ball"><span>Ball</span><button type="button" class="ss-color-clear" data-clear-key="ball" title="Stock art (no tint)">&times;</button></label>
                     </div>
+                    <label class="ss-check"><input type="checkbox" id="admin-grey-banners"><span>Greyscale mode &amp; menu buttons</span></label>
                     <div class="ss-row ss-row-inline">
-                        <button type="button" id="btn-admin-colors-save" class="btn btn-primary btn-small">Save for everyone</button>
                         <button type="button" id="btn-admin-colors-reset" class="btn btn-secondary btn-small">Defaults</button>
                     </div>
-                    <div class="ss-row"><span id="admin-colors-status" class="slider-label"></span></div>
+                    <p id="admin-colors-status" class="section-hint">Saved on this device — only you see these, and only while signed in.</p>
                 </div>
 
                 <div class="ss-cat">Other</div>
@@ -421,7 +423,8 @@
                        balls. For a real 3-ball game tap CLASSIC (full-table view) or FANTASIES
                        (the camera rides with the ball) on the bar the logo reveals. In a mode, the
                        &times; at the scoreboard's right corner leaves and <strong>TV</strong> on the
-                       left corner opens the mosaic, motion blur, board angle and extrude settings. Lose all three balls and the
+                       left corner opens the mosaic, motion blur, board angle and extrude settings (and, in FANTASIES, the
+                       camera's zoom and precision). Lose all three balls and the
                        high scores come up; on a published machine your best score posts to its
                        leaderboard automatically while you are signed in.</p></div>
 
@@ -483,6 +486,8 @@
             <div class="tv-row"><span class="slider-label">Motion blur: <span id="tv-blur-val">0</span>%</span><input type="range" id="tv-blur" min="0" max="100" value="0"></div>
             <div class="tv-row" id="tv-angle-row"><span class="slider-label">Board angle: <span id="tv-angle-val">0</span>&deg;</span><input type="range" id="tv-angle" min="0" max="40" value="0"></div>
             <div class="tv-row" id="tv-extrude-row"><span class="slider-label">Extrude: <span id="tv-extrude-val">0</span>%</span><input type="range" id="tv-extrude" min="0" max="100" value="0"></div>
+            <div class="tv-row" id="tv-zoom-row"><span class="slider-label">Camera zoom: <span id="tv-zoom-val">100</span>%</span><input type="range" id="tv-zoom" min="50" max="250" step="5" value="100"></div>
+            <div class="tv-row" id="tv-precision-row"><span class="slider-label">Camera precision: <span id="tv-precision-val">50</span>%</span><input type="range" id="tv-precision" min="0" max="100" value="50"></div>
         </div>
         <svg width="0" height="0" style="position:absolute" aria-hidden="true">
             <filter id="tv-mosaic-filter" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
