@@ -92,8 +92,8 @@
             to { transform: rotate(360deg); }
         }
     </style>
-  <script type="module" crossorigin src="/pinball/assets/index-Bu_-d45d.js"></script>
-  <link rel="stylesheet" crossorigin href="/pinball/assets/index-DYAx_bVJ.css">
+  <script type="module" crossorigin src="/pinball/assets/index-DysOYlTC.js"></script>
+  <link rel="stylesheet" crossorigin href="/pinball/assets/index-Bk0zkedg.css">
 </head>
 <body>
     <div id="pinballa-splash" role="status" aria-label="Loading">
@@ -180,7 +180,13 @@
                         <option value="contain">Fit (Contain)</option>
                         <option value="repeat">Tiling (Repeat)</option>
                         <option value="stretch">Stretch (100% 100%)</option>
+                        <option value="solid">Solid colour</option>
                     </select>
+                </div>
+                <div class="ss-row ss-row-inline" id="site-bg-color-container" style="display: none;">
+                    <span class="slider-label">Colour</span>
+                    <input type="color" id="site-bg-color" class="ss-color-input" aria-label="Background colour">
+                    <input type="text" class="ss-hex" id="site-bg-color-hex" spellcheck="false" autocomplete="off" maxlength="7" aria-label="Background colour hex">
                 </div>
                 <div class="ss-row" id="site-bg-size-container">
                     <span class="slider-label">Tile size: <span id="site-bg-size-val">100</span>px</span>
@@ -196,19 +202,23 @@
 
                 <div id="admin-colors" hidden>
                     <div class="ss-cat">Colours (admin testing)</div>
-                    <div class="ss-color-grid">
-                        <label class="ss-color"><input type="color" data-color-key="wall"><span>Walls</span></label>
-                        <label class="ss-color"><input type="color" data-color-key="bumper"><span>Bumper</span></label>
-                        <label class="ss-color"><input type="color" data-color-key="point"><span>Point</span></label>
-                        <label class="ss-color"><input type="color" data-color-key="grabber"><span>Grabber</span></label>
-                        <label class="ss-color"><input type="color" data-color-key="boss"><span>Boss</span></label>
-                        <label class="ss-color"><input type="color" data-color-key="mirrorGrid"><span>Mirror/Grid</span></label>
-                        <label class="ss-color"><input type="color" data-color-key="undoRedo"><span>Undo/Redo</span></label>
-                        <label class="ss-color ss-tint"><input type="color" data-color-key="flipper"><span>Flippers</span><button type="button" class="ss-color-clear" data-clear-key="flipper" title="Stock art (no tint)">&times;</button></label>
-                        <label class="ss-color ss-tint"><input type="color" data-color-key="plunger"><span>Plunger</span><button type="button" class="ss-color-clear" data-clear-key="plunger" title="Stock art (no tint)">&times;</button></label>
-                        <label class="ss-color ss-tint"><input type="color" data-color-key="ball"><span>Ball</span><button type="button" class="ss-color-clear" data-clear-key="ball" title="Stock art (no tint)">&times;</button></label>
+                    <div class="ss-row ss-row-inline">
+                        <span class="slider-label">Palette</span>
+                        <select id="admin-palette" class="field" aria-label="Colour palette"></select>
                     </div>
-                    <label class="ss-check"><input type="checkbox" id="admin-grey-banners"><span>Greyscale mode &amp; menu buttons</span></label>
+                    <div class="ss-color-grid">
+                        <label class="ss-color"><input type="color" data-color-key="playfield"><span>Gameboard</span><input type="text" class="ss-hex" data-hex-key="playfield" spellcheck="false" autocomplete="off" maxlength="7" aria-label="Gameboard hex"></label>
+                        <label class="ss-color"><input type="color" data-color-key="wall"><span>Walls</span><input type="text" class="ss-hex" data-hex-key="wall" spellcheck="false" autocomplete="off" maxlength="7" aria-label="Walls hex"></label>
+                        <label class="ss-color"><input type="color" data-color-key="bumper"><span>Bumper</span><input type="text" class="ss-hex" data-hex-key="bumper" spellcheck="false" autocomplete="off" maxlength="7" aria-label="Bumper hex"></label>
+                        <label class="ss-color"><input type="color" data-color-key="point"><span>Point</span><input type="text" class="ss-hex" data-hex-key="point" spellcheck="false" autocomplete="off" maxlength="7" aria-label="Point hex"></label>
+                        <label class="ss-color"><input type="color" data-color-key="grabber"><span>Grabber</span><input type="text" class="ss-hex" data-hex-key="grabber" spellcheck="false" autocomplete="off" maxlength="7" aria-label="Grabber hex"></label>
+                        <label class="ss-color"><input type="color" data-color-key="boss"><span>Boss</span><input type="text" class="ss-hex" data-hex-key="boss" spellcheck="false" autocomplete="off" maxlength="7" aria-label="Boss hex"></label>
+                        <label class="ss-color"><input type="color" data-color-key="mirrorGrid"><span>Mirror/Grid</span><input type="text" class="ss-hex" data-hex-key="mirrorGrid" spellcheck="false" autocomplete="off" maxlength="7" aria-label="Mirror/Grid hex"></label>
+                        <label class="ss-color"><input type="color" data-color-key="undoRedo"><span>Undo/Redo</span><input type="text" class="ss-hex" data-hex-key="undoRedo" spellcheck="false" autocomplete="off" maxlength="7" aria-label="Undo/Redo hex"></label>
+                        <label class="ss-color"><input type="color" data-color-key="flipper"><span>Flippers</span><button type="button" class="ss-color-clear" data-clear-key="flipper" title="Stock art (no tint)">&times;</button><input type="text" class="ss-hex" data-hex-key="flipper" spellcheck="false" autocomplete="off" maxlength="7" aria-label="Flippers hex"></label>
+                        <label class="ss-color"><input type="color" data-color-key="plunger"><span>Plunger</span><button type="button" class="ss-color-clear" data-clear-key="plunger" title="Stock art (no tint)">&times;</button><input type="text" class="ss-hex" data-hex-key="plunger" spellcheck="false" autocomplete="off" maxlength="7" aria-label="Plunger hex"></label>
+                        <label class="ss-color"><input type="color" data-color-key="ball"><span>Ball</span><button type="button" class="ss-color-clear" data-clear-key="ball" title="Stock art (no tint)">&times;</button><input type="text" class="ss-hex" data-hex-key="ball" spellcheck="false" autocomplete="off" maxlength="7" aria-label="Ball hex"></label>
+                    </div>
                     <div class="ss-row ss-row-inline">
                         <button type="button" id="btn-admin-colors-reset" class="btn btn-secondary btn-small">Defaults</button>
                     </div>
