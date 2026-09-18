@@ -659,6 +659,35 @@ body{
     z-index:6;
   }
   .hud.knobs-open #knobPanel{ transform:translateY(0) }
+  /* The pull bar. Pinned to the viewport's bottom edge, it rides the sheet's
+     top edge as the sheet opens: its translate is the sheet's height times the
+     open fraction (--sheet-h is measured by the script). While a finger is on
+     it the script writes both transforms inline and .knobs-dragging drops the
+     transitions, so the sheet tracks the finger 1:1. */
+  #knobHandle{
+    display:flex; align-items:center; justify-content:center;
+    position:fixed; left:0; right:0; bottom:0;
+    height:calc(34px + env(safe-area-inset-bottom, 0px));
+    padding-bottom:env(safe-area-inset-bottom, 0px);
+    box-sizing:border-box;
+    background:#fff;
+    border-top-left-radius:16px;
+    border-top-right-radius:16px;
+    box-shadow:0 -4px 16px rgba(0,0,0,.4);
+    touch-action:none;
+    cursor:grab;
+    transition:transform .3s ease, border-radius .3s ease, box-shadow .3s ease;
+    z-index:7;
+  }
+  #knobHandle::before{
+    content:""; width:44px; height:5px; border-radius:3px; background:#505050;
+  }
+  .hud.knobs-open #knobHandle{ box-shadow:none }
+  .hud.knobs-dragging #knobPanel,
+  .hud.knobs-dragging #knobHandle{ transition:none }
+  /* Open, the bar sits over the top of the sheet — this padding is the room
+     it takes, so it never covers the first row. */
+  #knobPanel{ padding-top:calc(34px + env(safe-area-inset-bottom, 0px) + 6px) }
   /* Each group becomes its own horizontally-scrollable row: header icon
      first (unchanged from desktop), its knobs trailing after it. */
   #knobPanel .col{
@@ -705,7 +734,13 @@ body{
   .fc-splash-loader{animation:none}
 }
 @media (prefers-reduced-motion:reduce) and (max-width:900px) and (orientation:portrait){
-  #knobPanel{transition:none}
+  #knobPanel,#knobHandle{transition:none}
+}
+/* The pull bar only exists where the sheet does (the portrait block shows it
+   with .hud #knobHandle, which outranks this). */
+#knobHandle{display:none}
+@media (max-width:900px) and (orientation:portrait){
+  .hud #knobHandle{display:flex}
 }
 </style>
 </head>
@@ -726,11 +761,12 @@ body{
 
 <div class="hud" id="hud">
   <div id="topBar">
-    <img id="logo" src="/fractalcrack/assets/fractalcrack-logo.png" alt="Fractal Crack" tabindex="0" role="button" aria-expanded="false" aria-label="Toggle controls">
+    <img id="logo" src="/fractalcrack/assets/fractalcrack-logo.png" alt="Fractal Crack">
     <div id="console">
       <div id="controlsBar" class="col g-controls"></div>
       <div id="knobPanel"></div>
     </div>
+    <div id="knobHandle" role="button" tabindex="0" aria-expanded="false" aria-label="Drag up for controls"></div>
     <!-- LAST in the bar on purpose: on a phone #topBar is a real flex row, so
          DOM order is what puts this at the right-hand end, and on every other
          viewport it positions itself into the top-right corner anyway.
@@ -2109,20 +2145,79 @@ function wake(){
 wake();
 
 /* ------------------------------------------------------------------ */
-/*  Logo tap — mobile-portrait knob sheet toggle                       */
-/*  Inert on desktop/landscape: #knobPanel only becomes a slide-up      */
-/*  sheet under the portrait media query, so toggling this class there  */
-/*  has nothing to move. See the CSS for the actual sheet mechanics.    */
+/*  Pull bar — mobile-portrait knob sheet                              */
+/*  Only shown under the portrait media query (see the CSS). Hold and   */
+/*  drag it up to open the sheet, down to close; the sheet follows the  */
+/*  finger 1:1 and settles open or shut on release by position, or by   */
+/*  direction on a flick. A plain tap toggles.                          */
 /* ------------------------------------------------------------------ */
-const logo = document.getElementById("logo");
+const knobHandle = document.getElementById("knobHandle");
+const FLICK_PX_MS = 0.4;     // release faster than this settles by direction
+const TAP_SLOP_PX = 6;       // moved less than this: it was a tap
+// How far the bar travels: from the screen's bottom edge to the sheet's top.
+function sheetTravel(){ return Math.max(0, knobPanelEl.offsetHeight - knobHandle.offsetHeight); }
+// f = 0 shut, 1 open. The sheet is only written inline mid-drag; at rest its
+// class-driven CSS owns it (so the 105% hide still clears its shadow).
+function placeSheet(f, dragging){
+  const travel = sheetTravel();
+  knobHandle.style.transform = `translateY(${-f * travel}px)`;
+  knobPanelEl.style.transform = dragging ? `translateY(${(1 - f) * knobPanelEl.offsetHeight}px)` : "";
+}
 function setKnobsOpen(open){
   hud.classList.toggle("knobs-open", open);
-  logo.setAttribute("aria-expanded", String(open));
+  knobHandle.setAttribute("aria-expanded", String(open));
+  knobHandle.setAttribute("aria-label", open ? "Drag down to hide controls" : "Drag up for controls");
+  placeSheet(open ? 1 : 0, false);
   // Opening cancels any idle countdown already scheduled (wake() won't set a
   // new one while the sheet is up); closing starts one again from here.
   wake();
 }
-logo.addEventListener("click", () => setKnobsOpen(!hud.classList.contains("knobs-open")));
+{
+  let drag = null;             // { id, y0, f0, f, lastY, lastT, v, moved }
+  knobHandle.addEventListener("pointerdown", e => {
+    if(drag) return;
+    drag = { id: e.pointerId, y0: e.clientY, f0: hud.classList.contains("knobs-open") ? 1 : 0,
+             lastY: e.clientY, lastT: e.timeStamp, v: 0, moved: false };
+    drag.f = drag.f0;
+    knobHandle.setPointerCapture(e.pointerId);
+    hud.classList.add("knobs-dragging");
+    wake();
+  });
+  knobHandle.addEventListener("pointermove", e => {
+    if(!drag || e.pointerId !== drag.id) return;
+    const dy = e.clientY - drag.y0;
+    if(Math.abs(dy) > TAP_SLOP_PX) drag.moved = true;
+    const travel = sheetTravel() || 1;
+    drag.f = Math.min(1, Math.max(0, drag.f0 - dy / travel));
+    const dt = e.timeStamp - drag.lastT;
+    if(dt > 0) drag.v = (e.clientY - drag.lastY) / dt;   // px/ms, +ve = downward
+    drag.lastY = e.clientY; drag.lastT = e.timeStamp;
+    placeSheet(drag.f, true);
+  });
+  const end = cancelled => e => {
+    if(!drag || e.pointerId !== drag.id) return;
+    const d = drag; drag = null;
+    // Measure the release BEFORE the transitions come back, so the settle animates.
+    void knobPanelEl.offsetHeight;
+    hud.classList.remove("knobs-dragging");
+    let open;
+    if(cancelled)                             open = d.f0 === 1;
+    else if(!d.moved)                         open = d.f0 !== 1;           // tap toggles
+    else if(e.timeStamp - d.lastT > 120)      open = d.f > 0.5;            // parked, then let go
+    else if(Math.abs(d.v) > FLICK_PX_MS)      open = d.v < 0;              // flick
+    else                                      open = d.f > 0.5;
+    setKnobsOpen(open);
+  };
+  knobHandle.addEventListener("pointerup", end(false));
+  knobHandle.addEventListener("pointercancel", end(true));
+  knobHandle.addEventListener("keydown", e => {
+    if(e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    setKnobsOpen(!hud.classList.contains("knobs-open"));
+  });
+  // The sheet's height follows the viewport; keep an open bar on its edge.
+  window.addEventListener("resize", () => placeSheet(hud.classList.contains("knobs-open") ? 1 : 0, false));
+}
 /* ------------------------------------------------------------------ */
 /*  Back to Corruption Corp — a two-step, same contract as Pinballa's  */
 /*                                                                     */
@@ -2175,11 +2270,6 @@ if(ccExit){
 const notTypingIn = e => e.target !== lgValueInput;
 hud.addEventListener("dblclick", e => { if(notTypingIn(e)) e.preventDefault(); });
 hud.addEventListener("selectstart", e => { if(notTypingIn(e)) e.preventDefault(); });
-logo.addEventListener("keydown", e => {
-  if(e.key !== "Enter" && e.key !== " ") return;
-  e.preventDefault();
-  setKnobsOpen(!hud.classList.contains("knobs-open"));
-});
 
 /* ------------------------------------------------------------------ */
 /*  Keys & resize                                                      */
