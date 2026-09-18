@@ -329,9 +329,18 @@ body{
   left:19%; top:19%; width:62%; height:62%;
   pointer-events:none;
 }
+/* NO will-change here, and that is the point. Every .cell carries a
+   drop-shadow filter, and a composited child forces its ancestor's filter to
+   be composited too: the shadow stops being pixels rasterised once with the
+   cell and becomes a render surface the compositor re-applies EVERY FRAME —
+   and every frame the WebGL canvas underneath changes, so every frame is
+   redrawn. That was twenty-nine offscreen blur passes a frame whenever the
+   console was up, on top of the fragment work the loop actually needs;
+   invisible on a desktop GPU, a real slice of an older phone's. Uncomposited,
+   the shadows are cached with the cells, and turning a knob repaints that one
+   cell — which refreshKnobs already limits to the hands that moved. */
 .cell .hand{
   transform-origin:50% 50%;
-  will-change:transform;
 }
 /* selection ring */
 .cell::after{
@@ -805,17 +814,29 @@ const cvs = document.getElementById("gl");
      the compositor blends the whole thing over the page on every frame.
    - depth/stencil: never used. They are per-pixel attachments on the default
      framebuffer; not asking for them saves the memory and the bandwidth. */
-const gl = cvs.getContext("webgl2", {
+const GL_ATTRS = {
   antialias:false,
   preserveDrawingBuffer:false,
   alpha:false,
   depth:false,
   stencil:false,
   powerPreference:"high-performance"
-});
+};
+/* WebGL2 when there is one, WebGL1 when there isn't. This used to be WebGL2 or
+   nothing, and "nothing" was exactly the older devices: every iPhone below
+   iOS 15, and Android phones whose GPU only does OpenGL ES 2 — they got a
+   sentence instead of the toy. Nothing here needs WebGL2: the loop is RGBA8
+   render targets, full-screen triangles and one texture fetch or a few, all
+   of which WebGL1 has. The one real difference is the shading language, and
+   the shaders are translated on the way in (see glsl()). `?webgl=1` forces the
+   fallback, which is the only way to see it on a machine that has WebGL2. */
+const FORCE_GL1 = new URLSearchParams(location.search).get("webgl") === "1";
+let gl = FORCE_GL1 ? null : cvs.getContext("webgl2", GL_ATTRS);
+const GL2 = !!gl;
+if(!gl) gl = cvs.getContext("webgl", GL_ATTRS) || cvs.getContext("experimental-webgl", GL_ATTRS);
 if(!gl){
   document.body.insertAdjacentHTML("beforeend",
-    '<div class="nogl">This needs WebGL2, which this browser did not provide.</div>');
+    '<div class="nogl">This needs WebGL, which this browser did not provide.</div>');
   // Nothing below this line runs, so hideSplashWhenDressed() never gets
   // defined — drop the splash right here instead of leaving it to the 8s
   // safety net, which would sit on top of the message above for no reason.
@@ -1070,9 +1091,48 @@ void main(){
 /* ------------------------------------------------------------------ */
 /*  GL helpers                                                         */
 /* ------------------------------------------------------------------ */
+/* GLSL ES 3.00 -> 1.00, for a WebGL1 context. The shaders above are written
+   once, in 3.00, and rewritten here on the way to the compiler — the
+   differences they actually touch are few enough to name:
+   - in/out become attribute/varying, and the fragment output is gl_FragColor;
+   - texture() is texture2D();
+   - tanh() does not exist in 1.00. softClip and the sharpness limiter both use
+     it; the stand-in clamps its argument to +-4.5 first, because a GPU without
+     highp does this in half floats, where exp(2x) past that overflows to
+     infinity and the ratio comes back NaN (tanh(4.5) is already 0.9998);
+   - highp is OPTIONAL in a 1.00 fragment shader, and asking for it on a GPU
+     that lacks it (the Mali-400 family, still in a lot of cheap phones) is a
+     compile error — so it falls back to mediump there. The render targets
+     are 8-bit anyway; what mediump costs is precision in the seed's clock,
+     which only shows after a long session. */
+const GLSL100_FRAG_HEAD = [
+  "#ifdef GL_FRAGMENT_PRECISION_HIGH",
+  "precision highp float;",
+  "#else",
+  "precision mediump float;",
+  "#endif",
+  "#define texture texture2D",
+  "#define o gl_FragColor",
+  "#define tanh fcTanh",
+  "float fcTanh(float x){ float e = exp(2.0*clamp(x, -4.5, 4.5)); return (e - 1.0)/(e + 1.0); }",
+  "vec3 fcTanh(vec3 x){ vec3 e = exp(2.0*clamp(x, -4.5, 4.5)); return (e - 1.0)/(e + 1.0); }"
+].join("\n");
+function glsl(src, frag){
+  if(GL2) return src;
+  src = src.replace("#version 300 es", "");
+  if(frag){
+    return src
+      .replace("precision highp float;", GLSL100_FRAG_HEAD)
+      .replace(/\bin vec2 v;/, "varying vec2 v;")
+      .replace(/\bout vec4 o;/, "");
+  }
+  return src
+    .replace(/\bin vec2 a;/, "attribute vec2 a;")
+    .replace(/\bout vec2 v;/, "varying vec2 v;");
+}
 function compile(type, src){
   const sh = gl.createShader(type);
-  gl.shaderSource(sh, src);
+  gl.shaderSource(sh, glsl(src, type === gl.FRAGMENT_SHADER));
   gl.compileShader(sh);
   if(!gl.getShaderParameter(sh, gl.COMPILE_STATUS))
     throw new Error(gl.getShaderInfoLog(sh));
@@ -1089,28 +1149,47 @@ function program(fsrc){
   return pr;
 }
 
-const progSeed = program(FRAG_SEED);
-const progFb   = program(FRAG_FEEDBACK);
-const progDisp = program(FRAG_DISPLAY);
-const progCopy = program(FRAG_COPY);
-
-const quad = gl.createBuffer();
-gl.bindBuffer(gl.ARRAY_BUFFER, quad);
-gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
-gl.enableVertexAttribArray(0);
-gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-
+/* Every GL object that does not depend on the canvas size: the programs, their
+   uniforms, the triangle, the stand-in texture. Built once at start-up — and
+   again if the context is LOST and restored (see the handlers after the main
+   loop), because a restored context has none of the old objects in it. */
+let progSeed, progFb, progDisp, progCopy, emptyTex;
+const U = { seed:{}, fb:{}, disp:{}, copy:{} };
 function uni(pr, name){ return gl.getUniformLocation(pr, name); }
-const U = {
-  seed:{ time:uni(progSeed,"uTime"), aspect:uni(progSeed,"uAspect") },
-  fb:{},
-  disp:{ tex:uni(progDisp,"uTex"), px:uni(progDisp,"uPx"), bloom:uni(progDisp,"uBloom"), scan:uni(progDisp,"uScan"), lines:uni(progDisp,"uLines") },
-  copy:{ tex:uni(progCopy,"uTex") }
-};
-["uPrev","uDelay","uCustom","uCenter","uPx","uTime","uAspect","uZoom","uRot","uWarp","uPan",
- "uBright","uContrast","uSat","uHue","uGain","uSharp","uBleed","uDelayMix","uEdge","uKaleido",
- "uMirrorX","uInvert","uSeedShape","uHasCustom","uSeedAmt","uSeedSize","uSeedPos"]
-  .forEach(n => U.fb[n] = uni(progFb, n));
+function initGL(){
+  progSeed = program(FRAG_SEED);
+  progFb   = program(FRAG_FEEDBACK);
+  progDisp = program(FRAG_DISPLAY);
+  progCopy = program(FRAG_COPY);
+
+  const quad = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+  U.seed = { time:uni(progSeed,"uTime"), aspect:uni(progSeed,"uAspect") };
+  U.disp = { tex:uni(progDisp,"uTex"), px:uni(progDisp,"uPx"), bloom:uni(progDisp,"uBloom"), scan:uni(progDisp,"uScan"), lines:uni(progDisp,"uLines") };
+  U.copy = { tex:uni(progCopy,"uTex") };
+  U.fb = {};
+  ["uPrev","uDelay","uCustom","uCenter","uPx","uTime","uAspect","uZoom","uRot","uWarp","uPan",
+   "uBright","uContrast","uSat","uHue","uGain","uSharp","uBleed","uDelayMix","uEdge","uKaleido",
+   "uMirrorX","uInvert","uSeedShape","uHasCustom","uSeedAmt","uSeedSize","uSeedPos"]
+    .forEach(n => U.fb[n] = uni(progFb, n));
+
+  /* Stand-in for the custom-shape sampler while nothing has been uploaded.
+     It must not be a ring texture: sampling the framebuffer we are drawing
+     into is a feedback loop, and that draw comes back as garbage. */
+  emptyTex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, emptyTex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+                new Uint8Array([0,0,0,0]));
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+}
+initGL();
 
 /* ---------- ring of framebuffers (ping-pong + delay history) ---------- */
 /* RING_MAX is what the Delay knob's ceiling needs: fourteen frames of history
@@ -1125,22 +1204,11 @@ let ring = [];
 let W = 0, H = 0, head = 0;
 function ringNeed(){ return Math.max(2, Math.min(RING_MAX, (P.delayFrames|0) + 2)); }
 
-/* Stand-in for the custom-shape sampler while nothing has been uploaded.
-   It must not be a ring texture: sampling the framebuffer we are drawing
-   into is a feedback loop, and that draw comes back as garbage. */
-const emptyTex = gl.createTexture();
-gl.bindTexture(gl.TEXTURE_2D, emptyTex);
-gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
-              new Uint8Array([0,0,0,0]));
-gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-
 function makeTarget(w, h){
   const tex = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, tex);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  // WebGL1 has no sized formats; its RGBA/UNSIGNED_BYTE is the same RGBA8.
+  gl.texImage2D(gl.TEXTURE_2D, 0, GL2 ? gl.RGBA8 : gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -1400,6 +1468,7 @@ const STEP_MS = 1000/60;
 let last = performance.now(), acc = 0;
 function frame(now){
   requestAnimationFrame(frame);
+  if(glLost){ last = now; return; }   // nothing to draw into until it's restored
   const raw = now - last; last = now;
   let dt = Math.min(raw, 250);
   /* Snap a near-60 Hz frame to exactly one step. A display that calls itself
@@ -1451,6 +1520,34 @@ function frame(now){
 /* A tab coming back to the front has been composited by someone else in the
    meantime; redraw once rather than trusting what is left on the canvas. */
 document.addEventListener("visibilitychange", () => { if(!document.hidden) dirty = true; });
+
+/* ---------- losing the GPU ----------
+   A browser takes a WebGL context away when the GPU resets, when memory runs
+   short, or — on a phone — when the app goes to the background for a while,
+   and older devices do all three far more often. Every texture, program and
+   framebuffer goes with it. Unhandled, the canvas simply stayed black for the
+   rest of the visit: the loop kept issuing draws into a context that no
+   longer existed, and nothing ever said so.
+   preventDefault() on the loss is what asks for it back; when it comes back,
+   everything is built again from scratch — the programs (initGL), a fresh
+   ring, reseeded since there is no picture left to carry across, and the
+   uploaded shape from the copy kept for exactly this (customSrc). The knobs
+   are JavaScript state and never went anywhere. */
+let glLost = false;
+cvs.addEventListener("webglcontextlost", e => {
+  e.preventDefault();
+  glLost = true;
+});
+cvs.addEventListener("webglcontextrestored", () => {
+  initGL();
+  ring = [];                      // the old targets died with the context
+  W = 0; H = 0; head = 0;
+  customTex = null;
+  if(customSrc) uploadCustom(customSrc);
+  glLost = false;
+  allocate();                     // an empty ring, so this reseeds
+  dirty = true;
+});
 
 /* ------------------------------------------------------------------ */
 /*  Console definition                                                 */
@@ -1590,12 +1687,10 @@ GROUPS.forEach(g => {
 
 function refreshKnobs(){
   /* Called on EVERY value change, which during a drag is every pointermove.
-     Writing a transform into all twenty-nine hands each time dirtied all
-     twenty-nine compositor layers (each one is a will-change:transform inside
-     a drop-shadowed cell, so each invalidation is a filter surface to
-     re-render) to move exactly one of them. Compare the string that would be
-     written — floats out of angleFor() differ in noise the rendered value
-     doesn't. */
+     Writing a transform into all twenty-nine hands each time repainted all
+     twenty-nine drop-shadowed cells to move exactly one of them. Compare the
+     string that would be written — floats out of angleFor() differ in noise
+     the rendered value doesn't. */
   cells.forEach(c => {
     if(!c.hand) return;
     const deg = angleFor(c).toFixed(2);
@@ -1890,6 +1985,7 @@ function setPlaying(v){
 function clearCustom(){
   if(!hasCustom) return;
   hasCustom = 0;
+  customSrc = null;
   if(customTex){ gl.deleteTexture(customTex); customTex = null; }
   if(P.seedShape === CUSTOM_INDEX) P.seedShape = DEFAULTS.seedShape;
   refreshKnobs();
@@ -1943,6 +2039,26 @@ function randomize(){
   scheduleAlloc();                   // delayFrames moved: the ring is resized
 }
 
+/* The uploaded shape as a texture. Kept as `customSrc` too, so a lost-and-
+   restored context can put it back (see "losing the GPU"). */
+let customSrc = null;
+function uploadCustom(src){
+  if(!customTex) customTex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, customTex);
+  gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, src);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+}
+/* A shape this big covers three screen-heights at the largest Injection
+   size, so there is nothing to see past it — and a phone photo is 12
+   megapixels: a 48 MB texture, over an older GPU's size limit outright (it
+   then fails silently and samples black) or enough to push the ring out of
+   its memory. Anything larger is scaled down on the way in. */
+const CUSTOM_MAX = Math.min(2048, gl.getParameter(gl.MAX_TEXTURE_SIZE) || 2048);
+
 /* uploaded png becomes an injectable shape */
 fileIn.addEventListener("change", () => {
   const f = fileIn.files && fileIn.files[0];
@@ -1950,14 +2066,19 @@ fileIn.addEventListener("change", () => {
   const url = URL.createObjectURL(f);
   const im = new Image();
   im.onload = () => {
-    if(!customTex) customTex = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, customTex);
-    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, im);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    let src = im;
+    const k = CUSTOM_MAX / Math.max(im.naturalWidth, im.naturalHeight);
+    if(k < 1){
+      const c = document.createElement("canvas");
+      c.width = Math.max(1, Math.round(im.naturalWidth * k));
+      c.height = Math.max(1, Math.round(im.naturalHeight * k));
+      const cx = c.getContext("2d");
+      cx.imageSmoothingQuality = "high";
+      cx.drawImage(im, 0, 0, c.width, c.height);
+      src = c;
+    }
+    customSrc = src;
+    uploadCustom(src);
     hasCustom = 1;
     P.seedShape = CUSTOM_INDEX;          // custom appears and is selected
     URL.revokeObjectURL(url);
