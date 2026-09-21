@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <!-- seo:start -->
     <title>Pinballa</title>
     <meta
       name="description"
@@ -39,6 +40,7 @@
         "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
       }
     </script>
+    <!-- seo:end -->
     <link rel="icon" type="image/png" href="/pinball/favicon.png">
     <link rel="manifest" href="/pinballa.webmanifest">
     <link rel="apple-touch-icon" href="/icons/pinballa-any-180.png">
@@ -92,8 +94,8 @@
             to { transform: rotate(360deg); }
         }
     </style>
-  <script type="module" crossorigin src="/pinball/assets/index-BpfO0J3o.js"></script>
-  <link rel="stylesheet" crossorigin href="/pinball/assets/index-nTxTkV51.css">
+  <script type="module" crossorigin src="/pinball/assets/index-rqqpKtd0.js"></script>
+  <link rel="stylesheet" crossorigin href="/pinball/assets/index-DOH0gmm5.css">
 </head>
 <body>
     <div id="pinballa-splash" role="status" aria-label="Loading">
@@ -252,10 +254,9 @@
 
     <div id="welcome-modal" class="modal-backdrop">
         <div class="panel welcome-panel">
-            <button id="btn-close-welcome" class="btn-close" aria-label="Close"><img src="/pinball/ui/pinballa-exit.png" alt="" draggable="false"></button>
-
             <div id="welcome-home">
                 <img class="welcome-logo" src="/pinball/ui/pinballa-logo.png" alt="Pinballa" draggable="false">
+                <p class="welcome-tagline">An online pinball machine maker</p>
                 <div class="welcome-actions">
                     <button id="btn-open-guide" class="btn btn-secondary btn-icon welcome-guide-btn" aria-label="Open guide" title="Guide"><span class="guide-btn-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v15H7a2 2 0 0 0-2 2V4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M5 19a2 2 0 0 1 2-2h12" fill="none" stroke="currentColor" stroke-width="2"/></svg></span><span class="guide-btn-spin" aria-hidden="true"></span></button>
                     <button id="btn-welcome-exit" class="btn btn-primary welcome-enter-btn"><span class="welcome-enter-label">ENTER</span></button>
@@ -580,6 +581,14 @@
                     <button id="btn-upvote" class="vote-btn" type="button" aria-label="Upvote">&#9650;</button>
                     <span id="vote-score" class="vote-score">0</span>
                     <button id="btn-downvote" class="vote-btn" type="button" aria-label="Downvote">&#9660;</button>
+                    <button id="btn-share-machine" class="vote-btn share-btn" type="button"
+                            aria-label="Copy this machine's link" title="Copy link">
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                            <path d="M9.5 14.5 14.5 9.5" />
+                            <path d="M12.8 7.1 14.9 5a4 4 0 0 1 5.7 5.7l-2.1 2.1" />
+                            <path d="M11.2 16.9 9.1 19a4 4 0 0 1-5.7-5.7l2.1-2.1" />
+                        </svg>
+                    </button>
                 </div>
                 <div class="detail-scroll">
                     <p id="detail-desc">Description goes here...</p>
