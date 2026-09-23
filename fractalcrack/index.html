@@ -365,8 +365,14 @@ body{
 .g-display  .tint{filter:hue-rotate(282deg)}
 
 /* ---------- legend ---------- */
+/* Base layout: bottom-left, stacked directly above the timeline dock, which
+   owns the corner now. --tl-top is where the dock's top edge sits (measured
+   by the script — the panel's height is its content's), so the legend clears
+   the square button when the editor is shut and the whole panel when it is
+   open. The desktop and portrait layouts put the legend elsewhere and
+   override this. */
 #legend{
-  position:absolute; left:22px; bottom:22px;
+  position:absolute; left:22px; bottom:calc(var(--tl-top, 12px) + 10px);
   min-width:210px; max-width:330px;
   background:#fff;
   border:1px solid var(--accent,#6b7280);
@@ -470,6 +476,10 @@ body{
   margin-top:8px; font-size:9.5px; letter-spacing:.16em;
   text-transform:uppercase; color:#6f7683;
 }
+/* What the timeline will do with this knob: "keying at 3.25s" while the
+   editor is parked on a time, "animated" when keyframes are driving it. */
+#legend .lg-tl{ margin-top:4px; color:var(--accent,#6f7683) }
+#legend .lg-tl:empty{ display:none }
 
 .nogl{
   position:fixed; inset:0; display:grid; place-items:center;
@@ -499,6 +509,388 @@ body{
 #photoHint.show{
   opacity:1;
   transition:opacity .16s ease;
+}
+
+/* ---------- keyframe timeline ----------
+   The bottom-left corner: a square toggle, and beside it (above it, on a
+   phone held upright) the editor panel. See "Keyframe timeline" in the script
+   for how it plays and keys.
+
+   The DOCK itself never takes a pointer — on a phone it spans the screen's
+   width, and an invisible box that wide would swallow every touch on the
+   canvas under it. Its two children take pointers instead, and only while the
+   hud is up: an id selector outranks `.hud.idle *`, so this is written as
+   `:not(.idle)` rather than letting a faded-out button stay clickable.
+
+   Shadows are box-shadows, not the drop-shadow FILTER the cells wear. The
+   playhead moves every frame, and a filtered ancestor of a changing child is
+   a surface the compositor re-renders every frame — the same trap the note
+   on .cell .hand describes. On a rectangle the two look the same. */
+#tlDock{
+  --tl-btn:clamp(36px, calc(var(--cell) * 0.62), 48px);
+  position:absolute;
+  /* Spans from the corner to the knobs: the console sits 18px in from the
+     right and is --console-w wide, and the dock stops one knob-gap short of
+     it, so the panel reads as the next column over rather than as a box
+     parked beside the grid. */
+  left:22px; bottom:22px;
+  right:calc(18px + var(--console-w) + var(--gap));
+  display:flex;
+  align-items:flex-end;
+  gap:10px;
+  pointer-events:none;
+}
+.hud:not(.idle) #tlToggle,
+.hud:not(.idle) #tlPanel{ pointer-events:auto }
+/* Owners only: the dock stays out of the page until the script has matched
+   the signed-in account against the owner digests (see "Owner gate"). */
+.hud:not(.tl-admin) #tlDock{ display:none }
+
+/* The square toggle — the exit plate's clothes (light plate, #505050 ring),
+   inverted while the editor is open so the state reads at a glance. */
+#tlToggle{
+  flex:0 0 auto;
+  width:var(--tl-btn); height:var(--tl-btn);
+  display:grid; place-items:center;
+  padding:0;
+  border:2px solid #505050;
+  border-radius:8px;
+  background:#f2f2f2;
+  color:#111;
+  cursor:pointer;
+  box-shadow:0 2px 8px rgba(0,0,0,.65);
+  transition:background .15s ease, border-color .15s ease, color .15s ease;
+}
+#tlToggle svg{ width:64%; height:64%; display:block; pointer-events:none }
+@media (hover:hover) and (pointer:fine){
+  #tlToggle:hover{ background:#fff; border-color:#000 }
+  .hud.tl-open #tlToggle:hover{ background:#000; border-color:#fff }
+}
+.hud.tl-open #tlToggle{ background:#111; color:#f2f2f2; border-color:#f2f2f2 }
+
+#tlPanel{
+  display:none;
+  /* Takes whatever the dock leaves after the toggle — i.e. everything up to
+     the knobs. The floor is explicit because everything in the track is
+     positioned, so its min-content width is zero: on a window too narrow to
+     hold it, a panel without one would collapse to nothing rather than run
+     under the console. */
+  flex:1 1 auto;
+  min-width:230px;
+  /* The lanes' columns (see "the lanes" below): name, line, delete. */
+  --tl-lab:116px; --tl-del:20px; --tl-lgap:8px;
+  --tl-lane-h:24px; --tl-ruler-h:17px;
+  --tl-row-h:var(--tl-lane-h);            /* a lane's real height (taller stacked) */
+  /* The lanes change shape with the PANEL's width, not the viewport's — see
+     the @container rule below. */
+  container:tlpanel / inline-size;
+  padding:8px 12px 10px;
+  /* Opaque, unlike the first cut's 86%: the ruler is sticky over lanes that
+     scroll under it and has to be the same ground as the panel it sits on. */
+  background:#0a0a0a;
+  border:2px solid #505050;
+  border-radius:8px;
+  box-shadow:0 2px 8px rgba(0,0,0,.65);
+  color:#e8ecf2;
+}
+.hud.tl-open #tlPanel{ display:block; animation:tlIn .16s ease }
+@keyframes tlIn{
+  from{ opacity:0; transform:translateY(6px) }
+  to{ opacity:1; transform:none }
+}
+
+.tl-head{ display:flex; align-items:center; gap:6px; margin-bottom:6px }
+/* "240 / 600 f": the playhead, then the loop's length — typed, in frames
+   (the loop's own, 60 a second). One unit for both numbers, and no LEN box:
+   CRENZO's digits are wide (a "0" is ~1.4em), and a labelled box of its own
+   pushed the header off a phone. */
+.tl-time{
+  flex:0 1 auto; min-width:0;
+  display:inline-flex; align-items:center; gap:5px;
+  font-size:11px; letter-spacing:.04em;
+  color:#e8ecf2;
+}
+#tlClock{ font-variant-numeric:tabular-nums; white-space:nowrap }
+.tl-sep{ color:#6b7280 }
+.tl-unit{ font-size:9px; letter-spacing:.12em; text-transform:uppercase; color:#8b909a }
+/* Import/export results and the like, in the header's spare middle. */
+#tlMsg{
+  flex:1 1 auto; min-width:0;
+  font-size:9px; letter-spacing:.14em; text-transform:uppercase;
+  color:#8b909a;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  opacity:0;
+  transition:opacity .4s ease;
+}
+#tlMsg.show{ opacity:1; transition-duration:.12s }
+
+.tl-b{
+  height:24px; min-width:24px;
+  padding:0 8px;
+  display:inline-flex; align-items:center; justify-content:center;
+  flex:0 0 auto;
+  border:1px solid #505050;
+  border-radius:5px;
+  background:transparent;
+  color:#c9ced6;
+  font-family:inherit;
+  font-size:10px; letter-spacing:.14em; text-transform:uppercase;
+  line-height:1;
+  cursor:pointer;
+  transition:border-color .12s, color .12s, background .12s;
+}
+.tl-b.tl-icon{ width:24px; padding:0 }
+.tl-b svg{ width:12px; height:12px; display:block; fill:currentColor; pointer-events:none }
+@media (hover:hover) and (pointer:fine){
+  .tl-b:hover:not(:disabled){ border-color:#f2f2f2; color:#fff }
+}
+.tl-b:disabled{ opacity:.32; cursor:default }
+#tlToggle:focus-visible,
+.tl-b:focus-visible,
+.tl-lab:focus-visible,
+.tl-del:focus-visible,
+#tlTrack:focus-visible{ outline:2px solid #fff; outline-offset:2px }
+
+.tl-b .tl-i-play{ display:none }
+.hud.tl-parked .tl-b .tl-i-play{ display:block }
+.hud.tl-parked .tl-b .tl-i-pause{ display:none }
+
+/* The length box. Sized to its digits by the script (tlSizeLen), since a
+   fixed width is either wasted on "600" or too narrow for "36000". It is the
+   one bit of real text in the hud besides the legend's value box, so it opts
+   back into selection. */
+#tlLen{
+  box-sizing:content-box;
+  width:4.35em;
+  height:20px;
+  padding:0 5px; margin:0;
+  border:1px solid #505050;
+  border-radius:4px;
+  outline:none;
+  background:transparent;
+  color:#e8ecf2;
+  font:inherit;
+  text-align:right;
+  font-variant-numeric:tabular-nums;
+  cursor:text;
+  -webkit-user-select:text; user-select:text;
+  transition:border-color .12s;
+}
+#tlLen:focus{ border-color:#f2f2f2 }
+
+/* Clear-all, two-step: a plain black bomb on the one LIGHT plate in the
+   panel; the first press turns it into a "?" (and the plate dark), and only
+   the second one clears — the same shape as the exit plate. */
+#tlClear{ background:#f2f2f2; border-color:#f2f2f2; color:#000 }
+#tlClear svg{ width:16px; height:16px }
+#tlClear .tl-q{ display:none; font-size:14px; font-weight:700; letter-spacing:0 }
+@media (hover:hover) and (pointer:fine){
+  #tlClear:hover:not(:disabled){ background:#fff; border-color:#fff; color:#000 }
+}
+#tlClear.armed,
+#tlClear.armed:hover:not(:disabled){ background:#000; border-color:#f2f2f2; color:#fff }
+#tlClear.armed svg{ display:none }
+#tlClear.armed .tl-q{ display:inline }
+
+/* ---- the lanes ----
+   One per automated knob (see "Keyframe timeline" in the script for when
+   they appear): its name in its colour, then its line, then its delete. The
+   ruler and the playhead are built on the SAME three columns (--tl-lab, the
+   line, --tl-del, --tl-lgap apart), so every line, the notches above them and
+   the playhead all share one x range without anything being measured.
+
+   #tlTrack is the scroller: past six lanes it stops growing and scrolls. The
+   ruler is sticky inside it rather than outside, so a scrollbar narrowing the
+   lanes narrows the ruler with them and the notches stay over the lines. */
+#tlTrack{
+  position:relative;
+  max-height:calc(var(--tl-ruler-h) + 6 * var(--tl-row-h));
+  /* ...and never so tall the panel (and the legend stacked on it) runs off a
+     short window: at least two lanes, then whatever the height allows. */
+  max-height:min(calc(var(--tl-ruler-h) + 6 * var(--tl-row-h)),
+                 max(calc(var(--tl-ruler-h) + 2 * var(--tl-row-h)), calc(100vh - 290px)));
+  max-height:min(calc(var(--tl-ruler-h) + 6 * var(--tl-row-h)),
+                 max(calc(var(--tl-ruler-h) + 2 * var(--tl-row-h)), calc(100svh - 290px)));
+  overflow-x:hidden; overflow-y:auto;
+  overscroll-behavior:contain;
+  /* Every gesture in here is the script's: scrub, grab, and on touch the
+     vertical scroll too (see the track's pointer handlers). */
+  touch-action:none;
+  cursor:pointer;
+  scrollbar-width:thin;
+  scrollbar-color:#505050 transparent;
+}
+#tlTrack::-webkit-scrollbar{ width:6px }
+#tlTrack::-webkit-scrollbar-thumb{ background:#505050; border-radius:3px }
+#tlInner{ position:relative }
+.tl-rulerrow{
+  position:sticky; top:0; z-index:2;
+  display:flex; gap:var(--tl-lgap);
+  height:var(--tl-ruler-h);
+  background:#0a0a0a;                    /* the panel's ground: lanes scroll under it */
+}
+.tl-rl-lab{ flex:0 0 var(--tl-lab) }
+.tl-rl-del{ flex:0 0 var(--tl-del) }
+#tlRuler{ position:relative; flex:1 1 auto; min-width:0 }
+.tl-tick{
+  position:absolute; bottom:1px;
+  width:1px; height:3px; margin-left:-.5px;
+  background:#5c6270;
+}
+.tl-tick.major{ height:6px; background:#9aa0aa }
+.tl-num{
+  position:absolute; top:0;
+  transform:translateX(-50%);
+  font-size:9px; line-height:9px; letter-spacing:.04em;
+  color:#8b909a;
+  white-space:nowrap;
+}
+/* The playhead's head, riding the ruler's bottom edge. Its stem is
+   #tlHead, down in the lanes; tlDrawHead moves both by the same amount. */
+#tlCap{ position:absolute; left:0; bottom:0; width:0; height:0 }
+#tlCap::after{
+  content:"";
+  position:absolute; left:-5px; top:-5px;
+  border:5px solid transparent;
+  border-top:6px solid #fff;
+  border-bottom:0;
+}
+
+.tl-lane{
+  display:flex; align-items:center; gap:var(--tl-lgap);
+  height:var(--tl-row-h);
+}
+/* The knob's name, in the knob's colour — and a button: pressing it selects
+   that knob, so a lane can always be traced back to the dial it belongs to. */
+.tl-lab{
+  flex:0 0 var(--tl-lab); min-width:0;
+  height:100%;
+  display:flex; align-items:center;
+  padding:0; margin:0;
+  border:0; background:none;
+  color:var(--k);
+  font-family:inherit; font-size:9px; line-height:1.15; letter-spacing:.02em;
+  text-align:left;
+  cursor:pointer;
+}
+/* Two lines at most. CRENZO is wide — "Kaleidoscope" alone is 111px at this
+   size — so the column is sized to hold the longest WORD, and a two-word name
+   ("Edge behaviour") takes the second line rather than an ellipsis. */
+.tl-lab > span{
+  display:-webkit-box;
+  -webkit-box-orient:vertical;
+  -webkit-line-clamp:2;
+  overflow:hidden;
+}
+@media (hover:hover) and (pointer:fine){
+  .tl-lab:hover{ text-decoration:underline; text-underline-offset:3px }
+}
+/* The draft lane — the knob last pressed, nothing keyed on it yet. */
+.tl-lane.draft .tl-lab{ opacity:.6 }
+.tl-lane.neutral .tl-lab{ color:#6b7280; cursor:default; text-decoration:none }
+/* The line itself: plain white, its OUTLINE the knob's group colour (the
+   hud's ring grey on the stand-in lane). A box-shadow ring rather than a
+   border, so the line keeps its size whatever the ring is doing. The lane
+   of the knob in hand — the one the legend shows, else the one last
+   pressed — glows. */
+.tl-line{
+  position:relative;
+  flex:1 1 auto; min-width:0;
+  height:6px;
+  background:#fff;
+  border-radius:3px;
+  box-shadow:0 0 0 2px var(--k);
+  transition:box-shadow .18s ease;
+}
+.tl-lane.hot .tl-line{ box-shadow:0 0 0 2px var(--k), 0 0 12px 1px var(--kg) }
+.tl-key{
+  position:absolute; top:50%;
+  width:9px; height:9px; margin:-4.5px 0 0 -4.5px;
+  background:var(--k);
+  border:1.5px solid #0a0a0a;
+  border-radius:1.5px;
+  transform:rotate(45deg);
+  transition:opacity .12s;
+}
+.tl-lane.hot .tl-key{ width:11px; height:11px; margin:-5.5px 0 0 -5.5px; border-color:#fff }
+.tl-key.doomed{ opacity:.15 }
+.tl-del{
+  flex:0 0 var(--tl-del);
+  height:min(20px, 100%);
+  display:grid; place-items:center;
+  padding:0; margin:0;
+  border:1px solid #505050;
+  border-radius:4px;
+  background:transparent;
+  color:#8b909a;
+  font-family:inherit; font-size:13px; line-height:1;
+  cursor:pointer;
+  transition:border-color .12s, color .12s;
+}
+@media (hover:hover) and (pointer:fine){
+  .tl-del:hover{ border-color:#f2f2f2; color:#fff }
+}
+/* Nothing to clear on a draft or the stand-in: the button keeps its room so
+   the lines stay lined up, it just is not there. */
+.tl-lane.draft .tl-del,
+.tl-lane.neutral .tl-del{ visibility:hidden }
+
+/* The stem: over every lane's line, inset to the same column, so it spans
+   all of them wherever the list is scrolled to. */
+#tlHeadLayer{
+  position:absolute; top:var(--tl-ruler-h); bottom:0;
+  left:calc(var(--tl-lab) + var(--tl-lgap));
+  right:calc(var(--tl-del) + var(--tl-lgap));
+  z-index:1;
+  pointer-events:none;
+}
+#tlHead{
+  position:absolute; left:-1px; top:0; bottom:0;
+  width:2px;
+  background:#fff;
+  box-shadow:0 0 0 1px rgba(0,0,0,.55);
+}
+
+.tl-foot{ display:flex; gap:6px; margin-top:8px }
+.tl-foot .tl-b{ flex:1 1 0; height:26px }
+
+@media (pointer:coarse){
+  .tl-b{ height:30px; min-width:30px }
+  .tl-b.tl-icon{ width:30px }
+  #tlLen{ height:26px; font-size:12px }
+  .tl-foot .tl-b{ height:32px }
+  #tlPanel{ --tl-del:28px; --tl-lane-h:30px }
+  .tl-del{ height:min(24px, 100%); font-size:15px }
+}
+
+/* A NARROW panel — a phone either way up, a small window — stacks each name
+   over its line instead of beside it, so the line keeps the width. Keyed to
+   the panel's own width, not a media query: the panel is whatever the dock
+   leaves between the toggle and the knobs, and that is not a function of any
+   one viewport number. The ruler and the playhead read the same --tl-lab, so
+   a 6px one still lines them up with the lines (and leaves the "0s" room to
+   centre on the line's start). */
+@container tlpanel (max-width: 440px){
+  #tlTrack{ --tl-lab:6px; --tl-row-h:calc(var(--tl-lane-h) + 4px) }
+  .tl-lane{
+    display:grid;
+    grid-template-columns:minmax(0, 1fr) var(--tl-del);
+    grid-template-rows:12px minmax(0, 1fr);
+    column-gap:var(--tl-lgap);
+    align-items:center;
+  }
+  /* Only as wide as the name: the rest of that row is line — a press there
+     seeks, like one on the line itself, rather than selecting the knob. */
+  .tl-lab{
+    grid-column:1; grid-row:1;
+    justify-self:start;
+    max-width:calc(100% - var(--tl-lab) - var(--tl-lgap));
+    height:12px;
+    margin-left:calc(var(--tl-lab) + var(--tl-lgap));
+  }
+  .tl-lab > span{ -webkit-line-clamp:1; word-break:break-all }
+  .tl-line{ grid-column:1; grid-row:2; margin-left:calc(var(--tl-lab) + var(--tl-lgap)) }
+  .tl-del{ grid-column:2; grid-row:1 / span 2 }
 }
 
 /* ---------- touch hit pads ----------
@@ -554,6 +946,9 @@ body{
     min-width:0;
     max-width:none;
   }
+  /* Same 18px inset as the console in the opposite corner (the right edge,
+     up to the knobs, is the base rule's). */
+  #tlDock{ left:18px; bottom:18px }
 }
 
 /* ---------- mobile portrait ----------
@@ -736,14 +1131,50 @@ body{
     transform:translateY(calc(-50% + 6px));
   }
   #legend.show{ transform:translateY(-50%) }
+
+  /* The dock sits on the pull bar, and RIDES the sheet: the script moves it
+     by the same amount it moves the bar (tlRide), so an open sheet carries the
+     timeline up on its top edge instead of covering it — you can watch the
+     outline and the keys land while turning the knobs below. The toggle is
+     the controls strip's width, and the panel starts where the strip ends,
+     so while the sheet is up the panel clears the strip entirely; the toggle
+     itself would land on the strip there, so it steps aside until the sheet
+     goes back down. */
+  #tlDock{
+    --tl-btn:36px;
+    left:20px; right:18px;
+    bottom:calc(34px + env(safe-area-inset-bottom, 0px) + 12px);
+    z-index:7;
+    transition:transform .3s ease;
+  }
+  .hud.knobs-dragging #tlDock{ transition:none }
+  #tlPanel{ min-width:0 }
+  .hud.knobs-open #tlToggle{ visibility:hidden }
+  /* Riding an open sheet, the panel has the sheet's height under it and the
+     top bar above it; three lanes, fewer on a short phone, then it scrolls. */
+  .hud.knobs-open #tlTrack{
+    max-height:min(calc(var(--tl-ruler-h) + 3 * var(--tl-row-h)),
+                   max(calc(var(--tl-ruler-h) + var(--tl-row-h)), calc(100vh - 600px)));
+    max-height:min(calc(var(--tl-ruler-h) + 3 * var(--tl-row-h)),
+                   max(calc(var(--tl-ruler-h) + var(--tl-row-h)), calc(100svh - 600px)));
+  }
+  /* Centred, the legend would land in the middle of the open editor. With it
+     open, it stacks on top instead, in the panel's own column (20px inset +
+     the 36px toggle + the 10px gap) so it stays off the controls strip. */
+  .hud.tl-open #legend{
+    top:auto; left:66px; right:18px;
+    bottom:calc(var(--tl-top, 0px) + 10px);
+    transform:translateY(6px);
+  }
+  .hud.tl-open #legend.show{ transform:translateY(0) }
 }
 
 @media (prefers-reduced-motion:reduce){
-  .hud,#legend,.cell::after,#fc-splash,#photoHint,#ccExit{transition:none}
-  .fc-splash-loader{animation:none}
+  .hud,#legend,.cell::after,#fc-splash,#photoHint,#ccExit,#tlToggle,.tl-line,#tlMsg{transition:none}
+  .fc-splash-loader,.hud.tl-open #tlPanel{animation:none}
 }
 @media (prefers-reduced-motion:reduce) and (max-width:900px) and (orientation:portrait){
-  #knobPanel,#knobHandle{transition:none}
+  #knobPanel,#knobHandle,#tlDock{transition:none}
 }
 /* The pull bar only exists where the sheet does (the portrait block shows it
    with .hud #knobHandle, which outranks this). */
@@ -794,12 +1225,73 @@ body{
     <div class="lg-value" id="lgValue"></div>
     <div class="lg-opts" id="lgOpts"></div>
     <div class="lg-lock" id="lgLock"></div>
+    <div class="lg-lock lg-tl" id="lgTl"></div>
+  </div>
+  <!-- Keyframe timeline. The toggle is always there; the panel is display:none
+       until it is opened. Everything in here is wired in the script's
+       "Keyframe timeline" section. -->
+  <div id="tlDock">
+    <button id="tlToggle" type="button" aria-expanded="false" aria-controls="tlPanel"
+            aria-label="Keyframe timeline" title="Keyframe timeline">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M3 17h18"/>
+        <path d="M8 7.5V21"/>
+        <path d="M5 4h6l-3 3.5z" fill="currentColor"/>
+        <path d="M16 13.5l3.5 3.5-3.5 3.5-3.5-3.5z" fill="currentColor"/>
+      </svg>
+    </button>
+    <div id="tlPanel" role="group" aria-label="Keyframe timeline">
+      <div class="tl-head">
+        <button id="tlPlay" class="tl-b tl-icon" type="button" aria-label="Pause the timeline" title="Pause / play the timeline">
+          <svg class="tl-i-pause" viewBox="0 0 12 12" aria-hidden="true"><rect x="2.2" y="1.5" width="2.6" height="9" rx=".5"/><rect x="7.2" y="1.5" width="2.6" height="9" rx=".5"/></svg>
+          <svg class="tl-i-play" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 1.5v9l7.5-4.5z"/></svg>
+        </button>
+        <!-- Where the playhead is / how long the loop is, in frames. The
+             second number is the length, and it is typed. -->
+        <span class="tl-time">
+          <span id="tlClock">0</span>
+          <span class="tl-sep" aria-hidden="true">/</span>
+          <input id="tlLen" type="text" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done"
+                 maxlength="5" autocomplete="off" spellcheck="false" value="600"
+                 title="Timeline length in frames (60 a second) — type to change"
+                 aria-label="Timeline length in frames">
+          <span class="tl-unit" aria-hidden="true">f</span>
+        </span>
+        <span id="tlMsg" role="status" aria-live="polite"></span>
+        <button id="tlClear" class="tl-b tl-icon" type="button" aria-label="Clear all keyframes" title="Clear all keyframes" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="10" cy="14.5" r="7.5"/>
+            <path d="M13.9 8.2l2.3-2.3 2.6 2.6-2.3 2.3z"/>
+            <path d="M17.5 7.2c.4-2 1.6-3.4 3.7-3.7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+          </svg>
+          <span class="tl-q" aria-hidden="true">?</span>
+        </button>
+      </div>
+      <!-- The lanes scroll past six. Lanes are built by the script (tlRender);
+           the ruler and the playhead share their columns. -->
+      <div id="tlTrack" tabindex="0" role="group" aria-label="Timeline lanes (arrow keys move the playhead)">
+        <div id="tlInner">
+          <div class="tl-rulerrow" aria-hidden="true">
+            <div class="tl-rl-lab"></div>
+            <div id="tlRuler"><div id="tlTicks"></div><div id="tlCap"></div></div>
+            <div class="tl-rl-del"></div>
+          </div>
+          <div id="tlRows"></div>
+          <div id="tlHeadLayer" aria-hidden="true"><div id="tlHead"></div></div>
+        </div>
+      </div>
+      <div class="tl-foot">
+        <button id="tlImport" class="tl-b" type="button" title="Load a preset file">Import</button>
+        <button id="tlExport" class="tl-b" type="button" title="Save the knobs and keyframes as a preset file">Export</button>
+      </div>
+    </div>
   </div>
 </div>
 
 <div id="photoHint" role="status" aria-live="polite"></div>
 
 <input type="file" id="fileIn" accept="image/png,image/jpeg,image/webp" hidden>
+<input type="file" id="tlFile" accept=".md,.markdown,.txt,text/markdown,text/plain" hidden>
 
 <script>
 (function(){
@@ -1364,6 +1856,19 @@ let drawHold = 0;                   // sustained while the right button is down
 let customTex = null, hasCustom = 0;
 const startT = performance.now();
 
+/* Keyframe timeline state — declared up here, not with the rest of it (see
+   "Keyframe timeline" further down), because wake() and the legend read it,
+   and wake() first runs before that section has. */
+let tlOpen = false;                 // the editor panel is showing
+let tlRunning = true;               // the playhead moves (while the loop plays)
+let tlTime = 0, tlLen = 600;        // FRAMES — ticks of the loop, 60 a second
+let tlPointerIn = false;            // a mouse is resting on the open panel
+let tlTyping = false;               // the length box has focus
+let tlActiveK = null;               // the knob last pressed (its lane glows, or is the draft)
+let tracks = {};                    // knob key -> [{t, v}], sorted by t, never empty;
+                                    // key order IS lane order (the order they were automated)
+const TL_KEYABLE = {};              // knob key -> its cell, for every knob it can key
+
 function drawQuad(){ gl.drawArrays(gl.TRIANGLES, 0, 3); }
 
 function seedInto(idx){
@@ -1492,6 +1997,10 @@ function frame(now){
        slowness is answered by dropping quality instead (see tune). */
     let ticks = 0, passes = 0;
     while(acc >= STEP_MS && ticks < 4 && passes + n <= 8){
+      /* The timeline runs on the loop's own clock, one tick at a time, so an
+         animation stays in step with the picture it is animating — a device
+         that falls behind falls behind in both together. */
+      tlTick();
       for(let i = 0; i < n; i++) step(t);
       passes += n; ticks++; stepped++;
       acc -= STEP_MS;
@@ -1516,6 +2025,7 @@ function frame(now){
      image identical to the one already on screen — and while PAUSED, all of
      them did. */
   if(stepped || dirty){ present(); dirty = false; }
+  if(tlOpen) tlDrawHead();
 }
 /* A tab coming back to the front has been composited by someone else in the
    meantime; redraw once rather than trusting what is left on the canvas. */
@@ -1685,7 +2195,7 @@ GROUPS.forEach(g => {
   if(!isControls) knobPanelEl.appendChild(col);
 });
 
-function refreshKnobs(){
+function refreshHands(){
   /* Called on EVERY value change, which during a drag is every pointermove.
      Writing a transform into all twenty-nine hands each time repainted all
      twenty-nine drop-shadowed cells to move exactly one of them. Compare the
@@ -1699,6 +2209,9 @@ function refreshKnobs(){
     c.hand.style.transform = "rotate(" + deg + "deg)";
   });
   dirty = true;                       // a display knob may have moved the frame
+}
+function refreshKnobs(){
+  refreshHands();
   if(legendTarget()) drawLegend(legendTarget());
 }
 
@@ -1711,6 +2224,7 @@ const lgTitle = document.getElementById("lgTitle");
 const lgValue = document.getElementById("lgValue");
 const lgOpts  = document.getElementById("lgOpts");
 const lgLock  = document.getElementById("lgLock");
+const lgTl    = document.getElementById("lgTl");
 const lgClose = document.getElementById("lgClose");
 
 lgClose.addEventListener("click", e => { e.stopPropagation(); select(null); });
@@ -1770,10 +2284,15 @@ function drawLegend(c){
        : c.def.t === "knob" ? "locked — drag, or tap the value to type one"
        : "")
     : "";
+  lgTl.textContent = tlHint(c);
   lgClose.hidden = !locked;           // only offer it when there is a lock to release
   legend.classList.add("show");
+  tlSyncFocus();
 }
-function hideLegend(){ cancelEditValue(); legend.classList.remove("show"); lgClose.hidden = true; }
+function hideLegend(){
+  cancelEditValue(); legend.classList.remove("show"); lgClose.hidden = true;
+  tlSyncFocus();
+}
 
 function updateLegend(){
   const t = legendTarget();
@@ -1783,7 +2302,7 @@ function updateLegend(){
 function select(c){
   if(selected) selected.el.classList.remove("sel");
   selected = c;
-  if(c) c.el.classList.add("sel");
+  if(c){ c.el.classList.add("sel"); tlActivate(c); }
   updateLegend();
 }
 
@@ -1851,6 +2370,7 @@ lgValue.addEventListener("click", e => {
 /* ------------------------------------------------------------------ */
 function setValue(c, val){
   const d = c.def;
+  const before = P[d.k];
   if(d.t === "sel"){
     const n = optionsOf(c).length;
     P[d.k] = Math.max(0, Math.min(n-1, Math.round(val)));
@@ -1869,6 +2389,11 @@ function setValue(c, val){
     if(d.k === "res") resetAdaptive();
   }
   refreshKnobs();
+  /* Every hand on a knob comes through here — drag, wheel, arrow keys, a
+     typed value, a picked option, a double-click home — so this is the one
+     place the timeline needs to hear about it. Only a real CHANGE keys: a
+     click that merely selects a knob jitters a pixel or two on the way. */
+  if(P[d.k] !== before) tlOnKnob(c, before);
 }
 
 function wire(c){
@@ -1899,6 +2424,7 @@ function wire(c){
        which is the whole drag. (A mouse already got here through pointerenter;
        setting it again is a no-op.) */
     hovered = c; updateLegend();
+    tlActivate(c);                      // pressing a knob points the timeline at it
     dragCount++; wake();                // hold the hud open while adjusting
     // Guarded like the release below: capture is a nicety (it's what keeps the
     // drag — and the legend — attached to this knob once the finger leaves it),
@@ -1993,7 +2519,7 @@ function clearCustom(){
 
 function doAction(act, c){
   if(act === "play")   setPlaying(!playing);
-  else if(act === "reset"){ clearCustom(); seedAll(); }
+  else if(act === "reset"){ clearCustom(); seedAll(); tlRestart(); }
   else if(act === "inject") pulse = 0.5;
   else if(act === "random") randomize();
   else if(act === "upload") fileIn.click();
@@ -2258,7 +2784,11 @@ function wake(){
   if(anyDown() && !held){ hud.classList.add("idle"); return; } // stays hidden until release
   hud.classList.remove("idle");
   clearTimeout(idleTimer);
-  if(dragCount > 0 || editingCell || held) return;
+  /* A mouse resting on the open timeline holds it too, for the sheet's
+     reason: it is somewhere you work, and a still pointer over it is someone
+     deciding where the next key goes, not someone who has walked away. */
+  const tlHeld = tlOpen && (tlPointerIn || tlTyping);
+  if(dragCount > 0 || editingCell || held || tlHeld) return;
   idleTimer = setTimeout(() => hud.classList.add("idle"), IDLE_MS);
 }
 ["pointermove","pointerdown","wheel","keydown","touchstart"].forEach(ev =>
@@ -2283,6 +2813,7 @@ function placeSheet(f, dragging){
   const travel = sheetTravel();
   knobHandle.style.transform = `translateY(${-f * travel}px)`;
   knobPanelEl.style.transform = dragging ? `translateY(${(1 - f) * knobPanelEl.offsetHeight}px)` : "";
+  tlRide(f * travel);                  // the timeline dock rides the sheet's edge too
 }
 function setKnobsOpen(open){
   hud.classList.toggle("knobs-open", open);
@@ -2378,6 +2909,975 @@ if(ccExit){
 }
 
 /* ------------------------------------------------------------------ */
+/*  Keyframe timeline                                                  */
+/*                                                                     */
+/*  A loop tlLen FRAMES long — frames of the feedback loop itself, 60   */
+/*  a second — and a playhead that walks it one frame per tick (tlTick, */
+/*  called from frame()). Every automated knob is set from its keys on  */
+/*  every tick: straight lines between keys, held steps for the two     */
+/*  pickers, the first key's value before it and the last one's after.  */
+/*                                                                     */
+/*  EDITING is a parked playhead. Clicking a lane puts the playhead     */
+/*  there and stops it; with the editor open and the playhead stopped,  */
+/*  any knob that changes is keyed at that frame (setValue ->           */
+/*  tlOnKnob). The feedback loop keeps running, so the change can be    */
+/*  watched while it is made. The header's play button sets the         */
+/*  playhead walking again, Reset starts it over from 0, and closing    */
+/*  the editor lets it play.                                            */
+/*                                                                     */
+/*  LANES: one per automated knob, in the order they were automated,    */
+/*  plus a DRAFT lane for the knob last pressed while it has no keys —  */
+/*  so pressing knob after knob recolours that one lane rather than     */
+/*  stacking up empty ones, and its first key makes it a lane of its    */
+/*  own. With nothing automated and no knob pressed yet, one grey lane  */
+/*  stands in, so there is always a line to click.                      */
+/* ------------------------------------------------------------------ */
+const tlDock      = document.getElementById("tlDock");
+const tlToggle    = document.getElementById("tlToggle");
+const tlPanel     = document.getElementById("tlPanel");
+const tlPlay      = document.getElementById("tlPlay");
+const tlClock     = document.getElementById("tlClock");
+const tlMsg       = document.getElementById("tlMsg");
+const tlLenIn     = document.getElementById("tlLen");
+const tlClear     = document.getElementById("tlClear");
+const tlTrack     = document.getElementById("tlTrack");      // the lanes' scroller
+const tlTicks     = document.getElementById("tlTicks");
+const tlCap       = document.getElementById("tlCap");
+const tlRows      = document.getElementById("tlRows");
+const tlHeadLayer = document.getElementById("tlHeadLayer");  // the lines' shared column
+const tlHead      = document.getElementById("tlHead");
+const tlImport    = document.getElementById("tlImport");
+const tlExport    = document.getElementById("tlExport");
+const tlFile      = document.getElementById("tlFile");
+
+const TL_FPS = Math.round(1000 / STEP_MS); // 60: a frame of the timeline is a tick of the loop
+const TL_MIN_LEN = 2, TL_MAX_LEN = 36000;  // frames; the top is ten minutes
+const TL_EPS = 1e-4;                      // two keys this close together are the same key
+const TL_HIT = COARSE ? 13 : 7;           // px either side of a key that grabs it
+const TL_SNAP_S = COARSE ? 8 : 5;         // px either side of a whole second that snaps to it
+const TL_DOOM = 26;                       // px a grabbed key is pulled off its line to delete it
+const TL_SLOP = COARSE ? 6 : 3;           // px a press may wander and still be a press
+const TL_ARM_MS = 4000, TL_ARM_MIN_MS = 350;
+
+/* Every knob and picker can be keyed except Resolution. That one is quality,
+   not look: moving it rebuilds every render target, and a preset has no
+   business setting someone else's GPU budget. */
+const TL_NAMES = {};                      // id or label, lowercased -> knob key (for import)
+cells.forEach(c => {
+  const d = c.def;
+  if((d.t !== "knob" && d.t !== "sel") || d.k === "res") return;
+  TL_KEYABLE[d.k] = c;
+  TL_NAMES[d.k.toLowerCase()] = d.k;
+  TL_NAMES[d.label.toLowerCase()] = d.k;
+});
+const TL_ORDER = Object.keys(TL_KEYABLE);  // console order
+
+const byT = (a, b) => a.t - b.t;
+const tlClampT = t => Math.max(0, Math.min(tlLen, t));
+const tlFmtT = t => String(Math.round(t));      // the header adds the unit once, after the length
+function tlHasKeys(){ for(const k in tracks) return true; return false; }
+function tlLastKey(){
+  let m = 0;
+  for(const k in tracks){ const ks = tracks[k]; m = Math.max(m, ks[ks.length - 1].t); }
+  return m;
+}
+
+/* A value the way its knob would hold it: in range, whole where the knob only
+   stops on whole numbers, a real option for a picker. An uploaded shape that
+   is not there any more falls back to the default one. Continuous knobs are
+   NOT rounded to their step — the step is the knob's feel under a hand, and
+   a zoom stepping 0.001 at a time between keys would visibly lurch. */
+function tlCoerce(c, v){
+  const d = c.def;
+  if(d.t === "sel"){
+    v = Math.round(v);
+    return (v >= 0 && v < optionsOf(c).length) ? v : DEFAULTS[d.k];
+  }
+  v = Math.max(d.min, Math.min(d.max, v));
+  return d.step >= 1 ? Math.round(v / d.step) * d.step : v;
+}
+
+function tlValueAt(keys, t, hold){
+  const n = keys.length;
+  if(t <= keys[0].t) return keys[0].v;
+  if(t >= keys[n - 1].t) return keys[n - 1].v;
+  let i = 1;
+  while(keys[i].t <= t) i++;              // keys[i-1].t <= t < keys[i].t
+  const a = keys[i - 1], b = keys[i];
+  return hold ? a.v : a.v + (b.v - a.v) * (t - a.t) / (b.t - a.t);
+}
+
+/* Set every keyed knob from its keys at the playhead. The knob under a hand
+   is skipped for as long as it is held, so an animated knob can be ridden
+   live while the timeline plays and rejoins its keys when let go — rather
+   than being snapped back out from under the drag sixty times a second. */
+function tlApply(){
+  const held = (dragCount > 0 && hovered && !tlGesture) ? hovered.def.k : null;
+  let changed = null;
+  for(const k in tracks){
+    if(k === held) continue;
+    const c = TL_KEYABLE[k];
+    const v = tlCoerce(c, tlValueAt(tracks[k], tlTime, c.def.t === "sel"));
+    if(v === P[k]) continue;
+    P[k] = v;
+    if(k === "delayFrames") scheduleAlloc();   // the ring's depth follows it
+    (changed || (changed = {}))[k] = true;
+  }
+  if(!changed) return;
+  refreshHands();
+  /* The legend only when it is showing a knob that moved: redrawing a PICKER
+     rebuilds its option buttons, and doing that every tick would pull them out
+     from under a click. */
+  const lt = legendTarget();
+  if(lt && changed[lt.def.k]) drawLegend(lt);
+}
+
+function tlTick(){
+  if(tlRunning){
+    tlTime += 1;
+    if(tlTime >= tlLen) tlTime -= tlLen;     // it loops
+  }
+  tlApply();
+}
+
+function tlSeek(t){
+  tlTime = tlClampT(t);
+  tlApply();
+  tlDrawHead();
+  tlRefreshHint();
+}
+function tlSetRunning(v){
+  tlRunning = v;
+  hud.classList.toggle("tl-parked", !v);
+  tlPlay.setAttribute("aria-label", v ? "Pause the timeline" : "Play the timeline");
+  tlRefreshHint();
+}
+/* Reset's half: back to the start, and walking. */
+function tlRestart(){
+  tlSetRunning(true);
+  tlSeek(0);
+}
+
+/* The knob last pressed (a knob's pointerdown, select(), any change through
+   setValue). It is what the draft lane shows, and its lane glows. Hover does
+   NOT move it: crossing the console on the way to a knob would otherwise
+   recolour, add and drop the draft lane at every knob the pointer passed. */
+function tlActivate(c){
+  if(!c || TL_KEYABLE[c.def.k] !== c) return;
+  // Pressed again, it only needs finding: its lane may be scrolled away.
+  if(c.def.k !== tlActiveK){ tlActiveK = c.def.k; tlRender(); }
+  tlReveal(tlActiveK);
+}
+
+/* A knob changed (see setValue). With the editor open and the playhead
+   parked, that is a key at the playhead — the one already there updated, or
+   a new one put in.
+   A knob's FIRST key also pins where it came from, at frame 0. Without that a
+   lone key is a constant: the knob just jumps to the new value across the
+   whole loop, and where on the line it was placed would not matter at all —
+   which is the one thing placing it is for. With it, the loop starts on the
+   look you had and arrives at the new one at the frame you picked. */
+function tlOnKnob(c, before){
+  if(TL_KEYABLE[c.def.k] !== c) return;
+  tlActivate(c);
+  if(!tlOpen || tlRunning) return;
+  const k = c.def.k;
+  let keys = tracks[k], added = false;
+  if(!keys){
+    keys = tracks[k] = [];
+    if(tlTime > TL_EPS) keys.push({t:0, v:before});
+  }
+  const at = keys.find(q => Math.abs(q.t - tlTime) < TL_EPS);
+  if(at) at.v = P[k];
+  else { keys.push({t:tlTime, v:P[k]}); keys.sort(byT); added = true; }
+  if(added){ tlRender(); tlSyncClear(); }
+}
+
+/* The legend's timeline line (see #legend .lg-tl). */
+function tlHint(c){
+  if(TL_KEYABLE[c.def.k] !== c) return "";
+  if(tlOpen && !tlRunning) return "keying at frame " + Math.round(tlTime);
+  if(tracks[c.def.k]) return tlOpen ? "animated — click the timeline to key it" : "animated on the timeline";
+  return "";
+}
+function tlRefreshHint(){
+  const c = legendTarget();
+  if(c) lgTl.textContent = tlHint(c);
+}
+
+/* Which lane glows: the knob the legend is showing (a hover, a lock), else
+   the one last pressed. Only classes change — hovering must never rebuild. */
+let tlLaneEls = {};                       // knob key -> its lane element
+let tlHotK = null;
+function tlSyncFocus(){
+  const c = legendTarget();
+  const k = (c && TL_KEYABLE[c.def.k] === c) ? c.def.k : tlActiveK;
+  if(k === tlHotK) return;
+  tlHotK = k;
+  for(const lk in tlLaneEls) tlLaneEls[lk].classList.toggle("hot", lk === k);
+}
+function tlRgba(hex, a){
+  const n = parseInt(hex.slice(1), 16);
+  return "rgba(" + (n >> 16 & 255) + "," + (n >> 8 & 255) + "," + (n & 255) + "," + a + ")";
+}
+
+/* ---------- drawing ---------- */
+let tlGesture = null;                     // the pointer in the lanes, if one is down
+let tlTrackW = 0;                         // the lines' width, in px
+let tlHeadPx = -1, tlClockTxt = "";
+
+/* Top to bottom: every automated knob in the order it was automated (the
+   key order of `tracks`), then the draft — the knob last pressed, if it has
+   no keys yet. */
+function tlLaneKeys(){
+  const ks = Object.keys(tracks);
+  if(tlActiveK && !tracks[tlActiveK]) ks.push(tlActiveK);
+  return ks;
+}
+function tlLaneEl(k){
+  const lane = document.createElement("div");
+  const lab  = document.createElement("button");
+  const line = document.createElement("div");
+  const del  = document.createElement("button");
+  lab.type = del.type = "button";
+  lab.className = "tl-lab";
+  line.className = "tl-line";
+  del.className = "tl-del";
+  del.textContent = "×";
+  if(!k){
+    lane.className = "tl-lane neutral";
+    lane.style.setProperty("--k", "#505050");
+    lab.appendChild(document.createElement("span")).textContent = "—";
+    lab.tabIndex = del.tabIndex = -1;
+    lab.title = "Press a knob to put it on the timeline";
+  } else {
+    const c = TL_KEYABLE[k], accent = c.group.accent, draft = !tracks[k];
+    lane.className = "tl-lane" + (draft ? " draft" : "");
+    lane.dataset.k = k;
+    lane.style.setProperty("--k", accent);
+    lane.style.setProperty("--kg", tlRgba(accent, .55));
+    lab.appendChild(document.createElement("span")).textContent = c.def.label;   // the span is what clamps
+    lab.title = c.group.name + " · " + c.def.label + (draft ? " — turn it to key it" : " — select this knob");
+    if(draft){ del.tabIndex = -1; del.setAttribute("aria-hidden", "true"); }
+    else {
+      del.title = "Clear " + c.def.label + "'s keyframes";
+      del.setAttribute("aria-label", del.title);
+      const doomed = (tlGesture && tlGesture.doomed) ? tlGesture.q : null;
+      tracks[k].forEach(q => {
+        const d = document.createElement("div");
+        d.className = "tl-key" + (q === doomed ? " doomed" : "");
+        d.style.left = (Math.min(1, q.t / tlLen) * 100) + "%";
+        line.appendChild(d);
+      });
+    }
+  }
+  lane.appendChild(lab); lane.appendChild(line); lane.appendChild(del);
+  return lane;
+}
+/* Every lane, rebuilt. They are a handful of elements, and every gesture in
+   here is captured on #tlTrack rather than on a lane, so a rebuild mid-drag
+   loses nothing. */
+function tlRender(){
+  if(!tlOpen) return;                    // drawn fresh whenever it opens
+  const ks = tlLaneKeys();
+  const frag = document.createDocumentFragment();
+  tlLaneEls = {};
+  if(!ks.length) frag.appendChild(tlLaneEl(null));
+  ks.forEach(k => { const el = tlLaneEl(k); tlLaneEls[k] = el; frag.appendChild(el); });
+  tlRows.textContent = "";
+  tlRows.appendChild(frag);
+  tlHotK = undefined; tlSyncFocus();
+}
+/* Scroll a lane into view inside the list (never the page): the sticky ruler
+   covers the top of the scrollport, so "in view" starts below it. */
+function tlReveal(k){
+  const el = tlLaneEls[k];
+  if(!el) return;
+  const rh = tlTrack.firstElementChild.firstElementChild.offsetHeight;   // the ruler row
+  const top = el.offsetTop - rh, bottom = el.offsetTop + el.offsetHeight;
+  if(top < tlTrack.scrollTop) tlTrack.scrollTop = top;
+  else if(bottom > tlTrack.scrollTop + tlTrack.clientHeight) tlTrack.scrollTop = bottom - tlTrack.clientHeight;
+}
+
+/* Seconds along the top — the loop runs 60 frames to the second, so the
+   notches are every TL_FPS frames. Every second gets one while they are at
+   least 4px apart; the numbered ones are spaced so their labels never touch. */
+function tlBuildRuler(){
+  tlTicks.textContent = "";
+  const w = tlTrackW;
+  if(!w) return;
+  const secs = tlLen / TL_FPS, pps = w / secs;
+  const label = [1, 2, 5, 10, 15, 30, 60, 120, 300].find(s => s * pps >= 30) || 600;
+  const minor = pps >= 4 ? 1 : label;
+  const frag = document.createDocumentFragment();
+  for(let s = 0; s <= secs + TL_EPS; s += minor){
+    const pct = (s / secs * 100) + "%";
+    const major = s % label === 0;
+    const tick = document.createElement("div");
+    tick.className = "tl-tick" + (major ? " major" : "");
+    tick.style.left = pct;
+    frag.appendChild(tick);
+    if(major){
+      const num = document.createElement("div");
+      num.className = "tl-num";
+      num.style.left = pct;
+      num.textContent = s + "s";
+      frag.appendChild(num);
+    }
+  }
+  tlTicks.appendChild(frag);
+}
+
+/* Every frame while the editor is open, so it only writes what changed. */
+function tlDrawHead(){
+  if(!tlOpen) return;
+  const px = Math.round(Math.min(1, tlTime / tlLen) * tlTrackW * 2) / 2;
+  if(px !== tlHeadPx){
+    tlHeadPx = px;
+    tlHead.style.transform = tlCap.style.transform = "translateX(" + px + "px)";
+  }
+  const txt = tlFmtT(tlTime);
+  if(txt !== tlClockTxt){ tlClockTxt = txt; tlClock.textContent = txt; }
+}
+function tlMeasure(){
+  const w = tlHeadLayer.clientWidth;
+  if(w === tlTrackW) return;
+  tlTrackW = w;
+  tlBuildRuler();
+  tlHeadPx = -1;
+  tlDrawHead();
+}
+
+/* Where the dock's top edge is, in px up from the bottom of the screen, as
+   --tl-top — what the legend stacks itself on (see its rule). Measured from
+   layout, not getBoundingClientRect, because mid-ride the rect is somewhere
+   in a transition and the number wanted is where it is going. */
+let tlLift = 0, tlTopPx = -1;
+function tlSyncTop(){
+  const b = parseFloat(getComputedStyle(tlDock).bottom) || 0;
+  const top = Math.round(b + tlDock.offsetHeight + tlLift);
+  if(top === tlTopPx) return;
+  tlTopPx = top;
+  hud.style.setProperty("--tl-top", top + "px");
+}
+/* Called by placeSheet with how far the pull bar has risen. Only the phone
+   layout has a sheet to ride. */
+function tlRide(lift){
+  tlLift = SHEET_MQ.matches ? lift : 0;
+  tlDock.style.transform = tlLift ? "translateY(" + (-tlLift) + "px)" : "";
+  tlSyncTop();
+}
+
+let tlMsgTimer = null;
+function tlNote(s){
+  tlMsg.textContent = s;
+  tlMsg.classList.add("show");
+  clearTimeout(tlMsgTimer);
+  tlMsgTimer = setTimeout(() => tlMsg.classList.remove("show"), 2600);
+}
+
+/* ---------- open / play ---------- */
+function tlSetOpen(v){
+  tlOpen = v;
+  hud.classList.toggle("tl-open", v);
+  tlToggle.setAttribute("aria-expanded", String(v));
+  if(v){
+    tlRender();
+    tlTrackW = 0; tlMeasure();           // display:none until now, so never measured
+    tlSyncClear();
+    tlClockTxt = ""; tlDrawHead();
+    if(tlActiveK) tlReveal(tlActiveK);
+  } else {
+    tlPointerIn = false;
+    tlDisarmClear();
+    /* Done editing: let it play. A playhead left parked behind a closed
+       editor just looks like an animation that has stopped working. */
+    if(!tlRunning) tlSetRunning(true);
+  }
+  tlSyncTop();
+  tlRefreshHint();
+  wake();
+}
+
+/* After a POINTER press, hand focus back to the page, so that Space goes on
+   meaning play/pause (the window handler only answers with focus on the
+   body) instead of pressing the same little button again. A keyboard press
+   (detail 0) keeps its focus. */
+const tlUnfocus = e => { if(e.detail > 0 && e.currentTarget.blur) e.currentTarget.blur(); };
+
+tlToggle.addEventListener("click", e => { tlUnfocus(e); tlSetOpen(!tlOpen); });
+
+tlPlay.addEventListener("click", e => {
+  tlUnfocus(e);
+  if(tlRunning){
+    tlSetRunning(false);
+    tlSeek(Math.round(tlTime));          // parks on a whole frame, like a click does
+  } else {
+    tlSetRunning(true);
+  }
+});
+
+/* ---------- length, typed in frames ----------
+   Committed on Enter or on leaving the box; Escape puts it back. It cannot be
+   made shorter than the last key — that key would sit somewhere the playhead
+   never goes — so a shorter number stops at the key and says so, rather than
+   silently throwing keys away over a typo. */
+/* CRENZO's digits are ~1.4em each, so the box is its digits wide and no more. */
+function tlSizeLen(){ tlLenIn.style.width = (Math.max(2, tlLenIn.value.length) * 1.45) + "em"; }
+function tlSetLen(L){
+  tlLen = L;
+  tlLenIn.value = String(L);
+  tlSizeLen();
+  if(tlTime > tlLen) tlTime %= tlLen;
+  tlBuildRuler(); tlRender();
+  tlHeadPx = -1; tlDrawHead();
+}
+function tlCommitLen(){
+  let n = parseInt(tlLenIn.value.replace(/[^\d]/g, ""), 10);
+  if(!isFinite(n)){ tlLenIn.value = String(tlLen); tlSizeLen(); return; }
+  n = Math.max(TL_MIN_LEN, Math.min(TL_MAX_LEN, n));
+  const last = Math.ceil(tlLastKey() - TL_EPS);
+  if(n < last){ n = last; tlNote("a key sits at frame " + last); }
+  if(n !== tlLen) tlSetLen(n);
+  else { tlLenIn.value = String(n); tlSizeLen(); }
+}
+tlLenIn.addEventListener("input", tlSizeLen);
+tlLenIn.addEventListener("keydown", e => {
+  e.stopPropagation();                   // Space, R and Escape mean other things out there
+  if(e.key === "Enter"){ e.preventDefault(); tlLenIn.blur(); }
+  else if(e.key === "Escape"){ e.preventDefault(); tlLenIn.value = String(tlLen); tlLenIn.blur(); }
+  else if(e.key === "ArrowUp" || e.key === "ArrowDown"){
+    e.preventDefault();
+    const by = (e.shiftKey ? TL_FPS : 1) * (e.key === "ArrowUp" ? 1 : -1);
+    tlLenIn.value = String((parseInt(tlLenIn.value, 10) || tlLen) + by);
+    tlCommitLen();
+  }
+});
+/* Typing holds the hud up (see wake): the keys pressed in here never reach
+   the window's wake listener, and a phone's on-screen keyboard sends none. */
+tlLenIn.addEventListener("focus", () => { tlTyping = true; wake(); tlLenIn.select(); });
+tlLenIn.addEventListener("blur", () => { tlTyping = false; tlCommitLen(); wake(); });
+
+/* ---------- clear all, two-step ---------- */
+let tlArmedAt = 0, tlArmTimer = null;
+function tlDisarmClear(){
+  tlArmedAt = 0;
+  clearTimeout(tlArmTimer);
+  tlClear.classList.remove("armed");
+  tlClear.setAttribute("aria-label", "Clear all keyframes");
+}
+function tlSyncClear(){
+  const any = tlHasKeys();
+  tlClear.disabled = !any;
+  if(!any) tlDisarmClear();
+}
+tlClear.addEventListener("click", e => {
+  tlUnfocus(e);
+  if(!tlArmedAt){
+    tlArmedAt = Date.now();
+    tlClear.classList.add("armed");
+    tlClear.setAttribute("aria-label", "Press again to clear all keyframes");
+    tlArmTimer = setTimeout(tlDisarmClear, TL_ARM_MS);
+    return;
+  }
+  /* The exit plate's floor: two presses inside one double-click are one
+     mis-hit, not a decision. */
+  if(Date.now() - tlArmedAt < TL_ARM_MIN_MS) return;
+  tracks = {};
+  tlSyncClear(); tlRender(); tlRefreshHint();
+  tlNote("keyframes cleared");
+});
+
+/* One knob's keys, from its lane's own delete. The knob keeps whatever value
+   it is showing; if it is the knob last pressed, its lane stays as the draft. */
+function tlClearKnob(k){
+  if(!tracks[k]) return;
+  delete tracks[k];
+  tlRender(); tlSyncClear(); tlRefreshHint();
+  tlNote(TL_KEYABLE[k].def.label + " cleared");
+}
+
+/* ---------- the lanes ---------- */
+/* The lines' shared column, in viewport px — every line spans the same x
+   range as #tlHeadLayer, so one rect serves all of them. */
+function tlGeom(){
+  const r = tlHeadLayer.getBoundingClientRect();
+  return {left:r.left, w:r.width || 1};
+}
+function tlHitKey(k, x, w){
+  const ks = k && tracks[k];
+  if(!ks) return null;
+  let best = null, bestD = TL_HIT + 0.001;
+  ks.forEach(q => {
+    const d = Math.abs(q.t / tlLen * w - x);
+    if(d < bestD){ bestD = d; best = q; }
+  });
+  return best;
+}
+/* Where a frame on the line settles: onto a key within reach in ANY lane (so
+   a key can be landed on exactly and edited, or lined up with another knob's,
+   not missed by a pixel), else onto a whole second, else a whole frame. */
+function tlSnap(t, w, skip){
+  const ppf = w / tlLen;
+  let best = null, bestD = TL_HIT + 0.001;
+  for(const k in tracks) tracks[k].forEach(q => {
+    if(q === skip) return;
+    const d = Math.abs(q.t - t) * ppf;
+    if(d < bestD){ bestD = d; best = q.t; }
+  });
+  if(best !== null) return best;
+  const s = Math.round(t / TL_FPS) * TL_FPS;
+  if(Math.abs(s - t) * ppf <= TL_SNAP_S) return s;
+  return Math.round(t);
+}
+function tlRemoveKey(k, q){
+  const ks = tracks[k];
+  if(!ks) return;
+  const i = ks.indexOf(q);
+  if(i >= 0) ks.splice(i, 1);
+  if(!ks.length) delete tracks[k];
+  tlRender(); tlSyncClear(); tlApply(); tlRefreshHint();
+  tlNote("keyframe removed");
+}
+
+/* Pointer handling for the whole list, on the scroller itself: lanes are
+   rebuilt under a drag (a moved key re-sorts, a deleted one goes), and a
+   capture held by an element that has just been replaced is a capture lost.
+     mouse/pen on a line — straight away: park + seek (or grab the key under
+       it), then drag to scrub or to move that key; off its line to delete it.
+     touch on a line — nothing until it moves or lifts: a lift is a tap (seek),
+       a mostly-VERTICAL move scrolls the list, anything else scrubs. Deciding
+       late is what keeps "scroll the lanes" from also yanking the playhead.
+       A touch that lands on a key grabs it at once, as a mouse does.
+     the name — a press there is the button's own click (select that knob);
+       on touch a vertical swipe starting there scrolls instead, and the click
+       it would end in is swallowed.
+     the delete — its own click, left entirely alone. */
+let tlLastPointer = "mouse";
+let tlSwallowClick = false;
+tlTrack.addEventListener("pointerdown", e => {
+  tlLastPointer = e.pointerType;
+  tlSwallowClick = false;
+  if(tlGesture || (e.pointerType === "mouse" && e.button !== 0)) return;
+  const tg = e.target;
+  if(tg.closest(".tl-del")) return;
+  const touch = e.pointerType === "touch";
+  const onLab = !!tg.closest(".tl-lab");
+  if(onLab && !touch) return;
+  const lane = tg.closest(".tl-lane");
+  const k = (lane && lane.dataset.k) || null;
+  const g0 = tlGeom();
+  const x = e.clientX - g0.left;
+  const q = onLab ? null : tlHitKey(k, x, g0.w);
+  tlGesture = {id:e.pointerId, x0:e.clientX, y0:e.clientY, left:g0.left, w:g0.w,
+               k, q, t0: q ? q.t : 0, onLab, scroll0: tlTrack.scrollTop,
+               mode: q ? "key" : (touch ? "maybe" : "scrub"), moved:false, doomed:false};
+  /* Not on a name: there the capture would retarget the click that selects
+     its knob. A touch is held by the name implicitly anyway, and its moves
+     still bubble up here. */
+  if(!onLab){ try{ tlTrack.setPointerCapture(e.pointerId); }catch(_){} }
+  dragCount++; wake();                    // held up for the length of the gesture
+  if(!onLab) e.preventDefault();
+  if(q){ tlSetRunning(false); tlSeek(q.t); }
+  else if(!touch){ tlSetRunning(false); tlSeek(tlClampT(tlSnap(x / g0.w * tlLen, g0.w))); }
+});
+tlTrack.addEventListener("pointermove", e => {
+  const g = tlGesture;
+  if(!g || e.pointerId !== g.id) return;
+  const dx = e.clientX - g.x0, dy = e.clientY - g.y0;
+  if(!g.moved && Math.abs(dx) < TL_SLOP && Math.abs(dy) < TL_SLOP) return;
+  g.moved = true;
+  if(g.mode === "maybe"){
+    const scrollable = tlTrack.scrollHeight > tlTrack.clientHeight + 1;
+    g.mode = (Math.abs(dy) > Math.abs(dx) && scrollable) ? "scroll" : (g.onLab ? "none" : "scrub");
+    if(g.mode === "scrub") tlSetRunning(false);
+  }
+  if(g.mode === "scroll"){ tlTrack.scrollTop = g.scroll0 - dy; return; }
+  if(g.mode === "scrub"){
+    tlSeek(tlClampT(tlSnap((e.clientX - g.left) / g.w * tlLen, g.w)));
+    return;
+  }
+  if(g.mode !== "key") return;
+  /* A grabbed key follows the pointer along its line. Pulled far enough off
+     it, above or below, it goes back to where it was and turns faint: let go
+     there and it is deleted, come back and it is not. */
+  g.doomed = Math.abs(dy) > TL_DOOM;
+  const t = g.doomed ? g.t0 : tlClampT(tlSnap(g.t0 + dx / g.w * tlLen, g.w, g.q));
+  g.q.t = t;
+  tracks[g.k].sort(byT);
+  tlRender();
+  tlSeek(t);
+});
+function tlEndGesture(e, cancelled){
+  const g = tlGesture;
+  if(!g || e.pointerId !== g.id) return;
+  tlGesture = null;
+  dragCount = Math.max(0, dragCount - 1);
+  try{ tlTrack.releasePointerCapture(e.pointerId); }catch(_){}
+  if(g.onLab && g.moved) tlSwallowClick = true;     // that was a swipe, not a press
+  if(g.mode === "maybe" && !g.moved && !g.onLab && !cancelled){
+    // A touch that never moved: a tap on the line.
+    tlSetRunning(false);
+    tlSeek(tlClampT(tlSnap((g.x0 - g.left) / g.w * tlLen, g.w)));
+  }
+  if(g.mode === "key" && g.moved && tracks[g.k]){
+    if(cancelled){                        // the system took the gesture: put it back
+      g.q.t = g.t0;
+      tracks[g.k].sort(byT);
+      tlRender(); tlSeek(g.t0);
+    } else if(g.doomed){
+      tlRemoveKey(g.k, g.q);
+    } else {
+      // Dropped onto another key of the same knob: the one carried there wins.
+      const ks = tracks[g.k];
+      for(let i = ks.length - 1; i >= 0; i--)
+        if(ks[i] !== g.q && Math.abs(ks[i].t - g.q.t) < TL_EPS) ks.splice(i, 1);
+      tlRender(); tlApply();
+    }
+  }
+  wake();
+}
+tlTrack.addEventListener("pointerup", e => tlEndGesture(e, false));
+tlTrack.addEventListener("pointercancel", e => tlEndGesture(e, true));
+
+/* The name selects its knob (and so points the timeline at it); the × clears
+   that knob's keys. Delegated, because the lanes are rebuilt all the time. */
+tlRows.addEventListener("click", e => {
+  const lane = e.target.closest(".tl-lane");
+  const k = lane && lane.dataset.k;
+  if(!k) return;
+  const btn = e.target.closest("button");
+  if(btn && e.detail > 0) btn.blur();
+  if(e.target.closest(".tl-del")){ tlClearKnob(k); return; }
+  if(e.target.closest(".tl-lab")){
+    if(tlSwallowClick){ tlSwallowClick = false; return; }
+    select(TL_KEYABLE[k]);
+  }
+});
+
+/* Right-click deletes the key under the pointer — a mouse shortcut for the
+   drag-off. Some phones raise this same event for a long press, where it
+   would delete a key for holding a finger still, so touch only has the drag. */
+tlTrack.addEventListener("contextmenu", e => {
+  e.preventDefault();
+  if(tlLastPointer === "touch") return;
+  const lane = e.target.closest(".tl-lane");
+  const k = lane && lane.dataset.k;
+  const g0 = tlGeom();
+  const q = tlHitKey(k, e.clientX - g0.left, g0.w);
+  if(q) tlRemoveKey(k, q);
+});
+
+/* Keyboard, with the list focused: arrows step a frame (a second with Shift),
+   Home/End jump to the ends, Delete removes the glowing lane's key at the
+   playhead. */
+tlTrack.addEventListener("keydown", e => {
+  if(e.target !== tlTrack) return;        // a name or a × has its own keys
+  let t = null;
+  const by = e.shiftKey ? TL_FPS : 1;
+  if(e.key === "ArrowLeft" || e.key === "ArrowDown") t = tlTime - by;
+  else if(e.key === "ArrowRight" || e.key === "ArrowUp") t = tlTime + by;
+  else if(e.key === "Home") t = 0;
+  else if(e.key === "End") t = tlLen;
+  else if(e.key === "Delete"){
+    e.preventDefault();
+    const ks = tlHotK && tracks[tlHotK];
+    const q = ks && ks.find(x => Math.abs(x.t - tlTime) < TL_EPS);
+    if(q) tlRemoveKey(tlHotK, q);
+    return;
+  }
+  else return;
+  e.preventDefault();
+  tlSetRunning(false);
+  tlSeek(tlClampT(Math.round(t)));
+});
+
+/* A mouse resting on the panel holds the hud up (see wake). Touch fires
+   enter/leave around every tap, so it would only ever flicker this. */
+tlPanel.addEventListener("pointerenter", e => {
+  if(e.pointerType === "touch") return;
+  tlPointerIn = true; wake();
+});
+tlPanel.addEventListener("pointerleave", () => {
+  if(!tlPointerIn) return;
+  tlPointerIn = false; wake();
+});
+
+/* ---------- preset files ----------
+   Markdown, so a preset reads as itself anywhere it is pasted or opened —
+   a chat, a gist, a text editor — and a person can write or tweak one by
+   hand. The TABLES are the data: import reads the rows, not a hidden blob
+   beside them, so editing the table is editing the preset. A row is
+   recognised by any cell naming a knob (its id or its label), its value is
+   the last cell, and in the Keyframes section its frame is the first.
+   Pickers are written by name ("mirror"), and read by name or number.
+   Keyframes are grouped by lane, in lane order, so a round trip brings the
+   lanes back in the order they were made. The first version of this wrote
+   SECONDS ("3.25s", "length: 10s"); anything with an s on it still reads as
+   seconds, so those files still load. */
+const tlNum = v => String(parseFloat(v.toPrecision(7)));
+function tlFmtV(c, v){
+  if(c.def.t === "sel"){ const o = optionsOf(c); return o[v] !== undefined ? o[v] : String(v); }
+  return tlNum(v);
+}
+function tlPresetText(){
+  const L = [
+    "# Fractal Crack preset",
+    "",
+    "A look and a keyframe timeline for [Fractal Crack](https://corruptioncorp.net/fractalcrack/).",
+    "To load it, open the timeline (the square button, bottom left), press **Import** and choose this file.",
+    "",
+    "- length: " + tlLen + " frames (" + TL_FPS + " a second)",
+    "",
+    "## Knobs",
+    "",
+    "Where the look starts. A knob with keyframes follows them instead.",
+    "",
+    "| knob | id | value |",
+    "| --- | --- | --- |"
+  ];
+  TL_ORDER.forEach(k => {
+    const c = TL_KEYABLE[k];
+    L.push("| " + c.def.label + " | " + k + " | " + tlFmtV(c, P[k]) + " |");
+  });
+  L.push("", "## Keyframes", "");
+  const lanes = Object.keys(tracks);
+  if(!lanes.length){
+    L.push("None — this preset is just the look.");
+  } else {
+    L.push("One lane per knob, in the order below. Straight lines between keys; the two pickers hold until their next key. The timeline loops.",
+           "",
+           "| frame | knob | id | value |",
+           "| --- | --- | --- | --- |");
+    lanes.forEach(k => {
+      const c = TL_KEYABLE[k];
+      tracks[k].forEach(q => L.push("| " + tlNum(q.t) + " | " + c.def.label + " | " + k + " | " + tlFmtV(c, q.v) + " |"));
+    });
+  }
+  return L.join("\n") + "\n";
+}
+
+const tlPlain = s => s.replace(/[`*]/g, "").trim().toLowerCase();
+/* "300", "300f", "300 frames" are frames; "5s", "5 sec" are seconds. */
+function tlParseFrames(s){
+  const m = /^([\d.]+)\s*([a-z]*)/.exec(tlPlain(s));
+  if(!m) return NaN;
+  const n = parseFloat(m[1]);
+  return m[2].charAt(0) === "s" ? n * TL_FPS : n;
+}
+function tlParseV(c, s){
+  s = tlPlain(s);
+  if(c.def.t === "sel"){
+    const i = optionsOf(c).indexOf(s);
+    if(i >= 0) return i;
+  }
+  const n = parseFloat(s);
+  return isFinite(n) ? n : null;
+}
+function tlParse(text){
+  const out = {len:0, knobs:{}, keys:[]};
+  let section = "knobs";
+  text.split(/\r?\n/).forEach(raw => {
+    const line = raw.trim();
+    const h = /^#{1,6}\s+(.*)$/.exec(line);
+    if(h){
+      const s = h[1].toLowerCase();
+      if(s.indexOf("key") >= 0) section = "keys";
+      else if(s.indexOf("knob") >= 0) section = "knobs";
+      return;
+    }
+    const len = /^[-*]?\s*length\s*[:=]\s*(.+)$/i.exec(line);
+    if(len){ out.len = tlParseFrames(len[1]); return; }
+    if(line.charAt(0) !== "|") return;
+    const cellsT = line.replace(/^\|/, "").replace(/\|$/, "").split("|");
+    let k = null;
+    for(const s of cellsT){ const m = TL_NAMES[tlPlain(s)]; if(m){ k = m; break; } }
+    if(!k) return;                        // a header row, a divider, or not ours
+    const v = tlParseV(TL_KEYABLE[k], cellsT[cellsT.length - 1]);
+    if(v === null) return;
+    if(section === "keys"){
+      const t = tlParseFrames(cellsT[0]);
+      if(isFinite(t) && t >= 0) out.keys.push({k, t, v});
+    } else {
+      out.knobs[k] = v;
+    }
+  });
+  return out;
+}
+/* Returns how many keyframes it loaded, or null if nothing in the file was a
+   knob it knows. */
+function tlLoad(text){
+  const d = tlParse(text);
+  const named = Object.keys(d.knobs);
+  if(!named.length && !d.keys.length) return null;
+  /* A file with a Knobs table is a whole look: whatever it leaves out goes
+     back to its default rather than keeping what happened to be on screen, so
+     one file looks the same wherever it is opened. A file of keyframes alone
+     (hand-written, say) leaves the rest of the knobs where they are. */
+  if(named.length){
+    TL_ORDER.forEach(k => { P[k] = tlCoerce(TL_KEYABLE[k], k in d.knobs ? d.knobs[k] : DEFAULTS[k]); });
+  }
+  tracks = {};                            // lanes in the order the file first names them
+  d.keys.forEach(r => {
+    const t = Math.min(TL_MAX_LEN, Math.round(r.t));
+    const v = tlCoerce(TL_KEYABLE[r.k], r.v);
+    const ks = tracks[r.k] || (tracks[r.k] = []);
+    const at = ks.find(q => Math.abs(q.t - t) < TL_EPS);
+    if(at) at.v = v; else ks.push({t, v});
+  });
+  for(const k in tracks) tracks[k].sort(byT);
+  const want = d.len > 0 ? Math.round(d.len) : tlLen;
+  tlSetLen(Math.max(TL_MIN_LEN, Math.min(TL_MAX_LEN, Math.max(want, Math.ceil(tlLastKey() - TL_EPS)))));
+  refreshKnobs();
+  scheduleAlloc();                       // Delay may have changed the ring's depth
+  tlSyncClear();
+  tlRestart();
+  return d.keys.length;
+}
+
+function tlStamp(){
+  const d = new Date(), p = n => String(n).padStart(2, "0");
+  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + "-" + p(d.getHours()) + p(d.getMinutes());
+}
+function tlDownload(blob, name){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  tlNote("exported");
+}
+tlExport.addEventListener("click", e => {
+  tlUnfocus(e);
+  const name = "fractal-crack-" + tlStamp() + ".md";
+  const blob = new Blob([tlPresetText()], {type:"text/markdown"});
+  /* On a phone the share sheet is "save it" and "send it to someone" in one
+     place, where a download tends to vanish into a folder nobody opens. It
+     has to be called straight from the tap (it needs the gesture), and
+     wherever it will not take the file — or on a desktop, where a download is
+     the expected thing — the file downloads instead. */
+  if(COARSE && navigator.share && navigator.canShare){
+    let file = null;
+    try{
+      file = new File([blob], name, {type:"text/markdown"});
+      if(!navigator.canShare({files:[file]})) file = null;
+    }catch(_){ file = null; }
+    if(file){
+      navigator.share({files:[file], title:"Fractal Crack preset"}).then(
+        () => tlNote("shared"),
+        err => { if(!err || err.name !== "AbortError") tlDownload(blob, name); });
+      return;
+    }
+  }
+  tlDownload(blob, name);
+});
+
+tlImport.addEventListener("click", e => { tlUnfocus(e); tlFile.click(); });
+tlFile.addEventListener("change", () => {
+  const f = tlFile.files && tlFile.files[0];
+  if(!f) return;
+  if(f.size > 256 * 1024){ tlNote("too big to be a preset"); tlFile.value = ""; return; }
+  // FileReader rather than file.text(), which older Safari does not have.
+  const fr = new FileReader();
+  fr.onload = () => {
+    const n = tlLoad(String(fr.result || ""));
+    tlNote(n === null ? "not a fractal crack preset"
+                      : "imported · " + n + " keyframe" + (n === 1 ? "" : "s"));
+  };
+  fr.onerror = () => tlNote("couldn't read that file");
+  fr.readAsText(f);
+  tlFile.value = "";                     // so choosing the same file again still fires
+});
+
+/* The lines' width sets the ruler's spacing and the playhead's travel (and
+   changes when a seventh lane brings the scrollbar in); the dock's height sets
+   where the legend stacks. */
+if(window.ResizeObserver){
+  new ResizeObserver(() => { if(tlOpen) tlMeasure(); }).observe(tlHeadLayer);
+  new ResizeObserver(() => tlSyncTop()).observe(tlDock);
+  /* The list's window shrinks when the phone's knob sheet opens (six lanes
+     down to three) — keep the knob in hand's lane in it. */
+  let tlListH = -1;
+  new ResizeObserver(() => {
+    if(!tlOpen || tlTrack.clientHeight === tlListH) return;
+    tlListH = tlTrack.clientHeight;
+    if(tlActiveK) tlReveal(tlActiveK);
+  }).observe(tlTrack);
+}
+window.addEventListener("resize", () => { if(tlOpen) tlMeasure(); tlSyncTop(); });
+tlSizeLen();
+tlSyncTop();
+
+/* ---------- owner gate ----------
+   The timeline editor is for the site's owners only. This app has no Firebase
+   of its own, but it shares the site's ORIGIN, and Firebase Auth persists per
+   origin — so whoever is signed in on corruptioncorp.net is signed in here.
+   Auth is loaded on demand from Google's CDN (same SDK version and config as
+   the site's src/firebase.js) AFTER the page is up, so visitors pay nothing
+   on the critical path. The account's email is compared by SHA-256 against
+   the same two digests src/accountData.js ships (keep them in step — see
+   CLAUDE.md, "The owner accounts"); the address itself never appears here.
+   UI gating only: there is nothing privileged behind it to protect. */
+const TL_ADMIN_SHA256 = [
+  "2ac91c1187b9c06118f5afd6f8505f531d921319ecd6b8ad77ad291b11cc9c09", // personal
+  "244a23a8951288834e686a7ce38bf3ab3e372ffe448b408d681c074eeb855fc4"  // brand
+];
+const TL_FB = "https://www.gstatic.com/firebasejs/12.15.0/";
+const TL_FB_CONFIG = {
+  apiKey: "AIzaSyCt62QC8ktwAAIQ1hLVMz0F-_vHQU2Qi7o",
+  authDomain: "gen-lang-client-0197721509.firebaseapp.com",
+  projectId: "gen-lang-client-0197721509",
+  appId: "1:159490676088:web:87afe27b355205f9aa648d"
+};
+/* Plain-JS SHA-256: crypto.subtle is ABSENT on plain http (the LAN dev
+   origin), the same trap accountData.js documents. */
+function tlSha256(str){
+  const b = new TextEncoder().encode(str), K = [], H = [];
+  const f = x => (x - Math.floor(x)) * 4294967296 | 0;
+  for(let n = 2, c = 0; c < 64; n++){
+    let p = true; for(let d = 2; d * d <= n; d++) if(n % d === 0){ p = false; break; }
+    if(p){ if(c < 8) H[c] = f(Math.sqrt(n)); K[c++] = f(Math.cbrt(n)); }
+  }
+  const l = b.length, words = new Uint32Array(((l + 8 >> 6) + 1) * 16);
+  for(let i = 0; i < l; i++) words[i >> 2] |= b[i] << (24 - (i & 3) * 8);
+  words[l >> 2] |= 0x80 << (24 - (l & 3) * 8);
+  words[words.length - 1] = l * 8;
+  const r = (x, n) => x >>> n | x << (32 - n), w = new Array(64);
+  for(let j = 0; j < words.length; j += 16){
+    let [a, bb, c, d, e, g, h, k] = H;
+    for(let i = 0; i < 64; i++){
+      if(i < 16) w[i] = words[j + i];
+      else { const x = w[i-15], y = w[i-2];
+        w[i] = (w[i-16] + (r(x,7) ^ r(x,18) ^ x >>> 3) + w[i-7] + (r(y,17) ^ r(y,19) ^ y >>> 10)) | 0; }
+      const t1 = (k + (r(e,6) ^ r(e,11) ^ r(e,25)) + (e & g ^ ~e & h) + K[i] + w[i]) | 0;
+      const t2 = ((r(a,2) ^ r(a,13) ^ r(a,22)) + (a & bb ^ a & c ^ bb & c)) | 0;
+      k = h; h = g; g = e; e = (d + t1) | 0; d = c; c = bb; bb = a; a = (t1 + t2) | 0;
+    }
+    H[0] += a; H[1] += bb; H[2] += c; H[3] += d; H[4] += e; H[5] += g; H[6] += h; H[7] += k;
+  }
+  return H.map(x => (x >>> 0).toString(16).padStart(8, "0")).join("");
+}
+function tlSetAdmin(on){
+  if(hud.classList.contains("tl-admin") === on) return;
+  hud.classList.toggle("tl-admin", on);
+  if(!on && tlOpen) tlSetOpen(false);
+  tlSyncTop();
+}
+async function tlCheckOwner(){
+  try{
+    const [{ initializeApp }, { getAuth, onAuthStateChanged }] = await Promise.all([
+      import(TL_FB + "firebase-app.js"), import(TL_FB + "firebase-auth.js")]);
+    const auth = getAuth(initializeApp(TL_FB_CONFIG));
+    onAuthStateChanged(auth, u => {
+      // An anonymous session (the graffiti wall's) is not an account.
+      const email = u && !u.isAnonymous && u.email ? u.email.trim().toLowerCase() : "";
+      tlSetAdmin(!!email && TL_ADMIN_SHA256.indexOf(tlSha256(email)) >= 0);
+    });
+  }catch(_){ /* offline or blocked: the editor simply stays hidden */ }
+}
+setTimeout(tlCheckOwner, 1500);
+
+/* ------------------------------------------------------------------ */
 /*  Double-click defences                                              */
 /*                                                                     */
 /*  The stylesheet already opts the hud out of selection; these cover   */
@@ -2388,7 +3888,7 @@ if(ccExit){
 /*  The legend's type-a-value box is the one piece of real text in      */
 /*  here, so it is exempt from both.                                   */
 /* ------------------------------------------------------------------ */
-const notTypingIn = e => e.target !== lgValueInput;
+const notTypingIn = e => e.target !== lgValueInput && e.target.id !== "tlLen";
 hud.addEventListener("dblclick", e => { if(notTypingIn(e)) e.preventDefault(); });
 hud.addEventListener("selectstart", e => { if(notTypingIn(e)) e.preventDefault(); });
 
