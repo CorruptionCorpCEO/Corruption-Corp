@@ -479,6 +479,42 @@ body{
 /* What the timeline will do with this knob: "keying at 3.25s" while the
    editor is parked on a time, "animated" when keyframes are driving it. */
 #legend .lg-tl{ margin-top:4px; color:var(--accent,#6f7683) }
+#legend .lg-value.lg-selval,
+#legend .lg-value.lg-none{ display:none }
+
+/* The legend is resizable from its top edge (#lgGrip, see "Legend resize" in
+   the script): shorter clips it (max-height), and all the way down it
+   CONDENSES to one line — the knob's title with its value beside it. */
+#lgGrip{
+  position:absolute; left:0; right:0; top:0; height:10px;
+  cursor:ns-resize; touch-action:none; z-index:1;
+}
+#lgGrip::after{
+  content:""; position:absolute; left:50%; top:3px;
+  width:36px; height:3px; margin-left:-18px; border-radius:2px;
+  background:#c9ced6; transition:background .12s;
+}
+@media (hover:hover) and (pointer:fine){ #lgGrip:hover::after{ background:#000 } }
+#lgGrip.dragging::after{ background:#000 }
+/* Clipped with clip-path, not overflow: overflow would also cut off the top
+   half of the grip, which straddles the border (on a phone). The inset's
+   negative top leaves room above for it. */
+#legend.clipped{ clip-path:inset(-10px 0 0 0) }
+#legend.condensed{
+  display:flex; align-items:baseline; gap:10px;
+  padding-top:9px; padding-bottom:8px;
+}
+#legend.condensed .lg-group,
+#legend.condensed .lg-opts,
+#legend.condensed .lg-lock{ display:none }
+#legend.condensed .lg-title{ flex:1 1 auto; min-width:0; padding-right:0;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+#legend.condensed .lg-value,
+#legend.condensed .lg-value.lg-selval{
+  display:block; flex:0 0 auto; margin:0; font-size:15px; padding-right:22px;
+}
+#legend.condensed .lg-value.lg-none{ display:none }
+#legend.condensed .lg-value-edit{ width:6em; font-size:15px }
 #legend .lg-tl:empty{ display:none }
 
 .nogl{
@@ -594,6 +630,23 @@ body{
   color:#e8ecf2;
 }
 .hud.tl-open #tlPanel{ display:block; animation:tlIn .16s ease }
+#tlPanel{ position:relative }
+/* The top edge is a grip: drag it up/down to make the lanes' window taller or
+   shorter (tlGrip in the script). A thin bar shows on hover so it can be
+   found; the hit strip is taller than it looks. */
+#tlGrip{
+  position:absolute; left:0; right:0; top:-7px; height:14px;
+  cursor:ns-resize; touch-action:none; z-index:3;
+}
+#tlGrip::after{
+  content:""; position:absolute; left:50%; top:5px;
+  width:44px; height:4px; margin-left:-22px; border-radius:2px;
+  background:#505050; opacity:.7; transition:opacity .12s, background .12s;
+}
+@media (hover:hover) and (pointer:fine){
+  #tlGrip:hover::after{ opacity:1; background:#f2f2f2 }
+}
+#tlGrip.dragging::after{ opacity:1; background:#f2f2f2 }
 @keyframes tlIn{
   from{ opacity:0; transform:translateY(6px) }
   to{ opacity:1; transform:none }
@@ -610,7 +663,18 @@ body{
   font-size:11px; letter-spacing:.04em;
   color:#e8ecf2;
 }
-#tlClock{ font-variant-numeric:tabular-nums; white-space:nowrap }
+/* The playhead's frame number sits in its OWN fixed-width box, right-aligned:
+   CRENZO's digits are proportional (a "1" is far narrower than a "0"), so a
+   bare number changed width every frame of playback and shook everything
+   after it in the header. The box is as wide as the LONGEST number the loop
+   can show — the length's digit count, set by tlDrawHead — and only changes
+   when that count does. */
+#tlClock{
+  display:inline-block; flex:0 0 auto;
+  width:4.35em;
+  text-align:right; overflow:hidden;
+  font-variant-numeric:tabular-nums; white-space:nowrap;
+}
 .tl-sep{ color:#6b7280 }
 .tl-unit{ font-size:9px; letter-spacing:.12em; text-transform:uppercase; color:#8b909a }
 /* Import/export results and the like, in the header's spare middle. */
@@ -677,6 +741,12 @@ body{
   transition:border-color .12s;
 }
 #tlLen:focus{ border-color:#f2f2f2 }
+/* Limitless: the length box stops meaning anything, so it greys out (and is
+   disabled); the ∞ button lights like the armed bomb, the panel's "on" look. */
+#tlLen:disabled{ color:#5c6270; border-color:#2e3036; cursor:default }
+.tl-time.inf .tl-unit{ color:#3e4148 }
+#tlInf{ font-size:15px; letter-spacing:0; font-family:ui-sans-serif, system-ui, sans-serif }
+#tlInf[aria-pressed="true"]{ background:#f2f2f2; border-color:#f2f2f2; color:#000 }
 
 /* Clear-all, two-step: a plain black bomb on the one LIGHT plate in the
    panel; the first press turns it into a "?" (and the plate dark), and only
@@ -776,6 +846,8 @@ body{
 /* Two lines at most. CRENZO is wide — "Kaleidoscope" alone is 111px at this
    size — so the column is sized to hold the longest WORD, and a two-word name
    ("Edge behaviour") takes the second line rather than an ellipsis. */
+.tl-lab{ cursor:ns-resize; touch-action:none }
+.tl-lane.neutral .tl-lab{ cursor:default }
 .tl-lab > span{
   display:-webkit-box;
   -webkit-box-orient:vertical;
@@ -814,6 +886,15 @@ body{
 }
 .tl-lane.hot .tl-key{ width:11px; height:11px; margin:-5.5px 0 0 -5.5px; border-color:#fff }
 .tl-key.doomed{ opacity:.15 }
+/* The selected key: white, ringed in its knob's colour — Backspace/Delete
+   removes it, dragging moves it. */
+.tl-key.sel,
+.tl-lane.hot .tl-key.sel{
+  width:13px; height:13px; margin:-6.5px 0 0 -6.5px;
+  background:#fff; border:2px solid var(--k);
+  box-shadow:0 0 0 1.5px #0a0a0a, 0 0 8px var(--kg);
+  z-index:1;
+}
 .tl-del{
   flex:0 0 var(--tl-del);
   height:min(20px, 100%);
@@ -892,6 +973,56 @@ body{
   .tl-line{ grid-column:1; grid-row:2; margin-left:calc(var(--tl-lab) + var(--tl-lgap)) }
   .tl-del{ grid-column:2; grid-row:1 / span 2 }
 }
+
+/* ---------- the panel in the LEGEND's clothes ----------
+   White card, 1px ring in --accent with a 3px left edge, 8px corners — the
+   legend's own rule, so the two read as one family. --accent is the glowing
+   lane's knob colour (set by tlSyncFocus), grey with no knob in hand, exactly
+   as the legend's falls back. Written as one block of overrides AFTER the
+   dark rules above (and their hover media blocks), so the structure stays
+   in one place and the skin in another. Things that were light-on-dark flip
+   to dark-on-light: the playhead, the ∞/armed "on" states, the bomb's plate.
+   The lines stay WHITE — here only their coloured outline draws them, which
+   is still the brief: a white line with the knob's colour round it. */
+#tlPanel{
+  background:#fff;
+  color:#000;
+  border:1px solid var(--accent, #6b7280);
+  border-left-width:3px;
+  border-radius:8px;
+}
+.tl-rulerrow{ background:#fff }
+.tl-time, #tlClock{ color:#000 }
+.tl-sep{ color:#9aa0aa }
+.tl-unit, #tlMsg, .tl-num{ color:#6f7683 }
+.tl-tick{ background:#b7bcc5 }
+.tl-tick.major{ background:#6f7683 }
+.tl-b{ border-color:rgba(0,0,0,.18); color:#4a5160 }
+#tlLen{ border-color:rgba(0,0,0,.18); color:#000 }
+#tlLen:focus{ border-color:var(--accent, #000) }
+#tlLen:disabled{ color:#b7bcc5; border-color:rgba(0,0,0,.08) }
+.tl-time.inf .tl-unit{ color:#c9ced6 }
+#tlClear{ background:transparent; border-color:rgba(0,0,0,.18); color:#000 }
+#tlInf[aria-pressed="true"],
+#tlClear.armed,
+#tlClear.armed:hover:not(:disabled){ background:#000; border-color:#000; color:#fff }
+.tl-del{ border-color:rgba(0,0,0,.18); color:#6f7683 }
+.tl-lane.neutral .tl-lab{ color:#9aa0aa }
+.tl-key{ border-color:#fff }
+.tl-lane.hot .tl-key{ border-color:#000 }
+#tlHead{ background:#000; box-shadow:0 0 0 1px rgba(255,255,255,.7) }
+#tlCap::after{ border-top-color:#000 }
+#tlTrack{ scrollbar-color:#c9ced6 transparent }
+#tlTrack::-webkit-scrollbar-thumb{ background:#c9ced6 }
+#tlGrip::after{ background:#c9ced6 }
+#tlToggle:focus-visible, .tl-b:focus-visible, .tl-lab:focus-visible,
+.tl-del:focus-visible, #tlTrack:focus-visible{ outline-color:#000 }
+@media (hover:hover) and (pointer:fine){
+  .tl-b:hover:not(:disabled), .tl-del:hover{ border-color:var(--accent, #000); color:#1a1d24 }
+  #tlClear:hover:not(:disabled){ background:rgba(0,0,0,.06); border-color:var(--accent, #000); color:#000 }
+  #tlGrip:hover::after{ background:#000 }
+}
+#tlGrip.dragging::after{ background:#000 }
 
 /* ---------- touch hit pads ----------
    The drawn control is a circle of --cell with about --gap of nothing between
@@ -1030,6 +1161,10 @@ body{
     flex-direction:column;
     align-items:flex-start;
     width:auto;
+    /* #topBar sits 20px in; this pulls the strip to 15px, the centre of the
+       gutter beside the panel/legend column (see #tlDock below), so the strip
+       and the timeline toggle stand in one centred column. */
+    margin-left:-5px;
   }
   /* Knobs: a bottom sheet, fixed to the viewport regardless of where it sits
      in the DOM (no ancestor here has a transform, so position:fixed anchors
@@ -1091,7 +1226,9 @@ body{
   .hud.knobs-dragging #knobHandle{ transition:none }
   /* Open, the bar sits over the top of the sheet — this padding is the room
      it takes, so it never covers the first row. */
-  #knobPanel{ padding-top:calc(34px + env(safe-area-inset-bottom, 0px) + 6px) }
+  /* Room for the visible TAB (17px + safe area, see #knobHandle::after), which
+     overlaps the open sheet's top; the handle's taller grab area sits above. */
+  #knobPanel{ padding-top:calc(17px + env(safe-area-inset-bottom, 0px) + 6px) }
   /* Each group becomes its own horizontally-scrollable row: header icon
      first (unchanged from desktop), its knobs trailing after it. */
   #knobPanel .col{
@@ -1142,14 +1279,22 @@ body{
      goes back down. */
   #tlDock{
     --tl-btn:36px;
-    left:20px; right:18px;
+    /* The toggle shares the controls strip's column, and that column is
+       CENTRED in the gutter left of the panel/legend column (which starts at
+       66px): (66 - 36) / 2 = 15px in, and the same 15px again to the panel.
+       #controlsBar is pulled onto the same 15px below. */
+    left:15px; right:18px;
+    gap:15px;
     bottom:calc(34px + env(safe-area-inset-bottom, 0px) + 12px);
     z-index:7;
     transition:transform .3s ease;
   }
   .hud.knobs-dragging #tlDock{ transition:none }
   #tlPanel{ min-width:0 }
-  .hud.knobs-open #tlToggle{ visibility:hidden }
+  /* The toggle stays up with the sheet open — it rides with the panel, so
+     the editor can be shut from there. It paints above the controls strip,
+     in the one case (a short phone) where the two can meet. */
+  #tlToggle{ position:relative; z-index:1 }
   /* Riding an open sheet, the panel has the sheet's height under it and the
      top bar above it; three lanes, fewer on a short phone, then it scrolls. */
   .hud.knobs-open #tlTrack{
@@ -1167,6 +1312,53 @@ body{
     transform:translateY(6px);
   }
   .hud.tl-open #legend.show{ transform:translateY(0) }
+  /* ONE drag-bar look for the three things dragged by their top edge on a
+     phone — the timeline panel (#tlGrip, the model), the legend and the knob
+     sheet's pull bar: a 44x4 pale-grey bar, black while held. The legend's
+     straddles its top border like the timeline's does. */
+  #lgGrip{ top:-7px; height:14px }
+  #lgGrip::after{ top:5px; width:44px; height:4px; margin-left:-22px; border-radius:2px; background:#c9ced6 }
+  /* Centred ON the tab's top border (like #tlGrip / #lgGrip: bar middle on
+     the edge), not in the middle of the 34px tab. */
+  /* The tab you SEE is half the handle's height, shadowless, drawn by ::after
+     along the handle's bottom; the handle itself stays the full 34px (+ the
+     safe area) and transparent, so the touch target is unchanged. The bar
+     straddles the visible tab's top edge. */
+  #knobHandle{ --tab-h:calc(17px + env(safe-area-inset-bottom, 0px)) }
+  #knobHandle::after{
+    content:""; position:absolute; left:0; right:0; bottom:0;
+    height:var(--tab-h);
+    background:#fff;
+    border:1px solid #6b7280; border-bottom:0;
+    border-top-left-radius:8px; border-top-right-radius:8px;
+    box-sizing:border-box;
+  }
+  #knobHandle::before{
+    position:absolute; left:50%; top:calc(100% - var(--tab-h) - 2px); margin-left:-22px;
+    width:44px; height:4px; border-radius:2px; background:#c9ced6; z-index:1;
+  }
+  .hud.knobs-dragging #knobHandle::before{ background:#000 }
+  /* ...and the sheet and its pull tab in the timeline panel's clothes too:
+     white card, 1px grey ring, 8px corners, the panel's shadow — so the three
+     drag-by-the-top surfaces read as one family. The tab's ring has no bottom
+     edge, it runs into the sheet. */
+  #knobPanel{
+    border:1px solid #6b7280; border-bottom:0;
+    border-top-left-radius:8px; border-top-right-radius:8px;
+    box-shadow:0 2px 8px rgba(0,0,0,.65);
+  }
+  #knobHandle{ background:transparent; border:0; box-shadow:none }
+  .hud.knobs-open #knobHandle::after{ border-color:transparent }
+  /* With the timeline SHUT the legend takes the panel's own place — same
+     column, same bottom edge (--tl-base: the dock's bottom, riding the sheet
+     like the panel would) — rather than floating mid-screen, so it is always
+     found in the one spot. */
+  .hud:not(.tl-open) #legend{
+    top:auto; left:66px; right:18px;
+    bottom:var(--tl-base, calc(34px + env(safe-area-inset-bottom, 0px) + 12px));
+    transform:translateY(6px);
+  }
+  .hud:not(.tl-open) #legend.show{ transform:translateY(0) }
 }
 
 @media (prefers-reduced-motion:reduce){
@@ -1219,6 +1411,8 @@ body{
     </a>
   </div>
   <div id="legend" role="status" aria-live="polite">
+    <div id="lgGrip" role="separator" aria-orientation="horizontal"
+         title="Drag to resize the legend — all the way down for one line (double-click to reset)"></div>
     <button id="lgClose" type="button" title="Deselect" aria-label="Deselect" hidden>&times;</button>
     <div class="lg-group" id="lgGroup"></div>
     <div class="lg-title" id="lgTitle"></div>
@@ -1241,6 +1435,8 @@ body{
       </svg>
     </button>
     <div id="tlPanel" role="group" aria-label="Keyframe timeline">
+      <div id="tlGrip" role="separator" aria-orientation="horizontal"
+           title="Drag to resize the timeline (double-click to reset)"></div>
       <div class="tl-head">
         <button id="tlPlay" class="tl-b tl-icon" type="button" aria-label="Pause the timeline" title="Pause / play the timeline">
           <svg class="tl-i-pause" viewBox="0 0 12 12" aria-hidden="true"><rect x="2.2" y="1.5" width="2.6" height="9" rx=".5"/><rect x="7.2" y="1.5" width="2.6" height="9" rx=".5"/></svg>
@@ -1256,6 +1452,9 @@ body{
                  title="Timeline length in frames (60 a second) — type to change"
                  aria-label="Timeline length in frames">
           <span class="tl-unit" aria-hidden="true">f</span>
+          <button id="tlInf" class="tl-b tl-icon" type="button" aria-pressed="false"
+                  title="Limitless: don't loop — the timeline runs on past its end"
+                  aria-label="Limitless timeline (no loop)">∞</button>
         </span>
         <span id="tlMsg" role="status" aria-live="polite"></span>
         <button id="tlClear" class="tl-b tl-icon" type="button" aria-label="Clear all keyframes" title="Clear all keyframes" disabled>
@@ -2229,6 +2428,64 @@ const lgClose = document.getElementById("lgClose");
 
 lgClose.addEventListener("click", e => { e.stopPropagation(); select(null); });
 
+/* ---------- Legend resize ----------
+   Drag the legend's top edge: up/down between one line and its full height.
+   Its natural height depends on the knob it shows (a picker's option rows,
+   the lock and timeline lines), so what is stored is a CAP (max-height) —
+   a shorter legend never gets padded out to it. At the bottom of the drag it
+   CONDENSES: title and value on one line, everything else hidden. The choice
+   persists per browser (fc-legend). Double-click the grip for the full legend. */
+const lgGrip = document.getElementById("lgGrip");
+const LG_STORE = "fc-legend";
+function lgApply(st){
+  legend.classList.toggle("condensed", !!st.condensed);
+  const cap = !st.condensed && st.h ? st.h + "px" : "";
+  legend.style.maxHeight = cap;
+  legend.classList.toggle("clipped", !!cap);
+}
+let lgState = {condensed:false, h:0};
+try{ const raw = localStorage.getItem(LG_STORE); if(raw) lgState = JSON.parse(raw) || lgState; }catch(_){}
+lgApply(lgState);
+function lgSave(){ try{ localStorage.setItem(LG_STORE, JSON.stringify(lgState)); }catch(_){} }
+{
+  let gd = null;
+  lgGrip.addEventListener("pointerdown", e => {
+    if(e.pointerType === "mouse" && e.button !== 0) return;
+    e.preventDefault(); e.stopPropagation();
+    // Measure both ends of the range with the cap off, then put it back.
+    const keep = {condensed:lgState.condensed, h:lgState.h};
+    lgApply({condensed:false, h:0}); const full = legend.offsetHeight;
+    lgApply({condensed:true});       const small = legend.offsetHeight;
+    lgApply(keep);
+    gd = {id:e.pointerId, y0:e.clientY, h0:legend.offsetHeight, full, small};
+    try{ lgGrip.setPointerCapture(e.pointerId); }catch(_){}
+    lgGrip.classList.add("dragging");
+    dragCount++; wake();
+  });
+  lgGrip.addEventListener("pointermove", e => {
+    if(!gd || e.pointerId !== gd.id) return;
+    const h = Math.max(gd.small, Math.min(gd.full, gd.h0 + (gd.y0 - e.clientY)));
+    if(h <= gd.small + 8) lgState = {condensed:true, h:0};
+    else if(h >= gd.full - 1) lgState = {condensed:false, h:0};
+    else lgState = {condensed:false, h:Math.round(h)};
+    lgApply(lgState);
+  });
+  const end = e => {
+    if(!gd || e.pointerId !== gd.id) return;
+    gd = null;
+    lgGrip.classList.remove("dragging");
+    dragCount = Math.max(0, dragCount - 1);
+    try{ lgGrip.releasePointerCapture(e.pointerId); }catch(_){}
+    lgSave(); wake();
+  };
+  lgGrip.addEventListener("pointerup", end);
+  lgGrip.addEventListener("pointercancel", end);
+  lgGrip.addEventListener("dblclick", e => {
+    e.stopPropagation();
+    lgState = {condensed:false, h:0}; lgApply(lgState); lgSave();
+  });
+}
+
 /* Touch has no passive hover, so PRESSING a control is what previews it: hold
    a knob and it appears in the legend, keep holding and drag up/down to move
    its value, let go and the legend follows whatever is selected again (see
@@ -2258,10 +2515,15 @@ function drawLegend(c){
 
   if(c.def.t === "knob"){
     if(editingCell !== c) lgValue.textContent = c.def.fmt(P[c.def.k]);
-    lgValue.style.display = "";
+    lgValue.classList.remove("lg-selval", "lg-none");
     lgValue.classList.toggle("editable", locked);
   } else if(c.def.t === "sel"){
-    lgValue.style.display = "none";
+    /* A picker's value is its option buttons below; the value line carries
+       the current option's name too, shown only when the legend is condensed
+       to one line (where the buttons are hidden). */
+    lgValue.textContent = optionsOf(c)[P[c.def.k]] || "";
+    lgValue.classList.remove("lg-none", "editable");
+    lgValue.classList.add("lg-selval");
     optionsOf(c).forEach((name, i) => {
       const b = document.createElement("button");
       b.type = "button";
@@ -2277,7 +2539,9 @@ function drawLegend(c){
     });
   } else {
     /* buttons carry no value modifier */
-    lgValue.style.display = "none";
+    lgValue.textContent = "";
+    lgValue.classList.remove("lg-selval", "editable");
+    lgValue.classList.add("lg-none");
   }
   lgLock.textContent = locked
     ? (c.def.t === "sel" ? "locked — click an option"
@@ -2806,13 +3070,21 @@ const knobHandle = document.getElementById("knobHandle");
 const FLICK_PX_MS = 0.4;     // release faster than this settles by direction
 const TAP_SLOP_PX = 6;       // moved less than this: it was a tap
 // How far the bar travels: from the screen's bottom edge to the sheet's top.
-function sheetTravel(){ return Math.max(0, knobPanelEl.offsetHeight - knobHandle.offsetHeight); }
+/* The TAB you see is only the bottom part of the handle (its ::after — the
+   rest is transparent grab area), so everything is measured off the tab's
+   height: the tab's top edge, where the bar sits, and the sheet's top edge
+   are kept on the SAME line at every point of a drag, open and shut. */
+function sheetTabH(){
+  return parseFloat(getComputedStyle(knobHandle, "::after").height) || knobHandle.offsetHeight;
+}
+function sheetTravel(){ return Math.max(0, knobPanelEl.offsetHeight - sheetTabH()); }
 // f = 0 shut, 1 open. The sheet is only written inline mid-drag; at rest its
 // class-driven CSS owns it (so the 105% hide still clears its shadow).
 function placeSheet(f, dragging){
   const travel = sheetTravel();
   knobHandle.style.transform = `translateY(${-f * travel}px)`;
-  knobPanelEl.style.transform = dragging ? `translateY(${(1 - f) * knobPanelEl.offsetHeight}px)` : "";
+  // The sheet's top rides the tab's top: shut, it tucks exactly under the tab.
+  knobPanelEl.style.transform = dragging ? `translateY(${(1 - f) * travel}px)` : "";
   tlRide(f * travel);                  // the timeline dock rides the sheet's edge too
 }
 function setKnobsOpen(open){
@@ -2939,6 +3211,7 @@ const tlPlay      = document.getElementById("tlPlay");
 const tlClock     = document.getElementById("tlClock");
 const tlMsg       = document.getElementById("tlMsg");
 const tlLenIn     = document.getElementById("tlLen");
+const tlInfBtn    = document.getElementById("tlInf");
 const tlClear     = document.getElementById("tlClear");
 const tlTrack     = document.getElementById("tlTrack");      // the lanes' scroller
 const tlTicks     = document.getElementById("tlTicks");
@@ -3012,7 +3285,9 @@ function tlValueAt(keys, t, hold){
    live while the timeline plays and rejoins its keys when let go — rather
    than being snapped back out from under the drag sixty times a second. */
 function tlApply(){
-  const held = (dragCount > 0 && hovered && !tlGesture) ? hovered.def.k : null;
+  // The knob under a hand — or under a lane name being dragged like one.
+  const held = (tlGesture && tlGesture.mode === "dial") ? tlGesture.k
+             : (dragCount > 0 && hovered && !tlGesture) ? hovered.def.k : null;
   let changed = null;
   for(const k in tracks){
     if(k === held) continue;
@@ -3035,9 +3310,41 @@ function tlApply(){
 function tlTick(){
   if(tlRunning){
     tlTime += 1;
-    if(tlTime >= tlLen) tlTime -= tlLen;     // it loops
+    if(tlInf){ if(tlTime > tlLen) tlGrow(); }  // limitless: runs on, the line stretches
+    else if(tlTime >= tlLen) tlTime -= tlLen;  // it loops
   }
   tlApply();
+}
+
+/* ---------- limitless (∞) ----------
+   Off, the timeline loops at the typed length. On, it never wraps: the
+   playhead just keeps going and every knob holds its last key forever after,
+   so an animation plays ONCE and stays on its final look. The line still
+   needs an end to be drawn against, so the span it shows (tlLen) grows by
+   half again whenever the playhead reaches it — a rebuild every so often, not
+   every frame. The typed length is kept (tlLenBase) and comes back, never
+   shorter than the last key, when ∞ is switched off; Reset shrinks the span
+   back to it as well. */
+let tlInf = false, tlLenBase = 600;
+function tlSpanFloor(){ return Math.max(tlLenBase, Math.ceil(tlLastKey() - TL_EPS)); }
+function tlGrow(){
+  tlLen = Math.max(tlSpanFloor(), Math.ceil(tlTime * 1.5));
+  tlBuildRuler(); tlRender();
+  tlHeadPx = -1; tlDrawHead();
+}
+function tlSetInf(on){
+  if(on === tlInf) return;
+  if(on) tlLenBase = tlLen;
+  tlInf = on;
+  tlInfBtn.setAttribute("aria-pressed", String(on));
+  tlLenIn.disabled = on;
+  tlLenIn.parentElement.classList.toggle("inf", on);
+  if(on){ tlLenIn.value = String(tlLenBase); tlSizeLen(); }
+  else {
+    const L = tlSpanFloor();
+    tlSetLen(Math.max(TL_MIN_LEN, Math.min(TL_MAX_LEN, L)));
+    tlLenBase = tlLen;
+  }
 }
 
 function tlSeek(t){
@@ -3055,6 +3362,7 @@ function tlSetRunning(v){
 /* Reset's half: back to the start, and walking. */
 function tlRestart(){
   tlSetRunning(true);
+  if(tlInf && tlLen !== tlSpanFloor()){ tlLen = tlSpanFloor(); tlV0 = 0; tlVL = 0; tlBuildRuler(); tlRender(); }
   tlSeek(0);
 }
 
@@ -3115,6 +3423,9 @@ function tlSyncFocus(){
   if(k === tlHotK) return;
   tlHotK = k;
   for(const lk in tlLaneEls) tlLaneEls[lk].classList.toggle("hot", lk === k);
+  // The panel's ring takes that knob's colour, as the legend's does.
+  if(k) tlPanel.style.setProperty("--accent", TL_KEYABLE[k].group.accent);
+  else tlPanel.style.removeProperty("--accent");
 }
 function tlRgba(hex, a){
   const n = parseInt(hex.slice(1), 16);
@@ -3123,8 +3434,17 @@ function tlRgba(hex, a){
 
 /* ---------- drawing ---------- */
 let tlGesture = null;                     // the pointer in the lanes, if one is down
+let tlSel = null;                         // {k, q}: the selected keyframe, if any
 let tlTrackW = 0;                         // the lines' width, in px
-let tlHeadPx = -1, tlClockTxt = "";
+let tlHeadPx = -1, tlClockTxt = "", tlHeadOff = false, tlClockDigits = 0;
+
+/* The VIEW: which frames the lines show. tlVL 0 means all of them; Ctrl+wheel
+   over the lanes zooms it about the pointer (see the track's wheel handler).
+   Every frame<->px mapping goes through these two, so keys, ruler, playhead,
+   hits, snaps and drags all agree at any zoom. */
+let tlV0 = 0, tlVL = 0;
+const tlVLen = () => (tlVL > 0 ? tlVL : tlLen);
+const tlFrac = t => (t - tlV0) / tlVLen();
 
 /* Top to bottom: every automated knob in the order it was automated (the
    key order of `tracks`), then the draft — the knob last pressed, if it has
@@ -3165,8 +3485,10 @@ function tlLaneEl(k){
       const doomed = (tlGesture && tlGesture.doomed) ? tlGesture.q : null;
       tracks[k].forEach(q => {
         const d = document.createElement("div");
-        d.className = "tl-key" + (q === doomed ? " doomed" : "");
-        d.style.left = (Math.min(1, q.t / tlLen) * 100) + "%";
+        d.className = "tl-key" + (q === doomed ? " doomed" : "") + (tlSel && q === tlSel.q ? " sel" : "");
+        const f = tlFrac(q.t);
+        if(f < -0.001 || f > 1.001) return;           // zoomed out of view
+        d.style.left = (f * 100) + "%";
         line.appendChild(d);
       });
     }
@@ -3206,13 +3528,18 @@ function tlBuildRuler(){
   tlTicks.textContent = "";
   const w = tlTrackW;
   if(!w) return;
-  const secs = tlLen / TL_FPS, pps = w / secs;
-  const label = [1, 2, 5, 10, 15, 30, 60, 120, 300].find(s => s * pps >= 30) || 600;
-  const minor = pps >= 4 ? 1 : label;
+  /* Worked in FRAMES so a zoomed-in view can mark fractions of a second:
+     the steps are frame counts, whole seconds from 60 up. Labels stay in
+     seconds ("1.5s"), the ruler's unit at every zoom. */
+  const v0 = tlV0, vl = tlVLen(), ppf = w / vl;
+  const STEPS = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 18000];
+  const li = STEPS.findIndex(st => st * ppf >= 30);
+  const label = li < 0 ? 36000 : STEPS[li];
+  const minor = STEPS.slice(0, li < 0 ? STEPS.length : li).reverse().find(st => label % st === 0 && st * ppf >= 4) || label;
   const frag = document.createDocumentFragment();
-  for(let s = 0; s <= secs + TL_EPS; s += minor){
-    const pct = (s / secs * 100) + "%";
-    const major = s % label === 0;
+  for(let f = Math.ceil(v0 / minor) * minor; f <= v0 + vl + TL_EPS; f += minor){
+    const pct = ((f - v0) / vl * 100) + "%";
+    const major = f % label === 0;
     const tick = document.createElement("div");
     tick.className = "tl-tick" + (major ? " major" : "");
     tick.style.left = pct;
@@ -3221,7 +3548,7 @@ function tlBuildRuler(){
       const num = document.createElement("div");
       num.className = "tl-num";
       num.style.left = pct;
-      num.textContent = s + "s";
+      num.textContent = parseFloat((f / TL_FPS).toFixed(2)) + "s";
       frag.appendChild(num);
     }
   }
@@ -3231,13 +3558,21 @@ function tlBuildRuler(){
 /* Every frame while the editor is open, so it only writes what changed. */
 function tlDrawHead(){
   if(!tlOpen) return;
-  const px = Math.round(Math.min(1, tlTime / tlLen) * tlTrackW * 2) / 2;
+  const f = tlFrac(tlTime);
+  const px = Math.round(Math.max(0, Math.min(1, f)) * tlTrackW * 2) / 2;
   if(px !== tlHeadPx){
     tlHeadPx = px;
     tlHead.style.transform = tlCap.style.transform = "translateX(" + px + "px)";
   }
+  const off = f < -0.001 || f > 1.001;        // zoomed away from the playhead
+  if(off !== tlHeadOff){
+    tlHeadOff = off;
+    tlHead.style.visibility = tlCap.style.visibility = off ? "hidden" : "";
+  }
   const txt = tlFmtT(tlTime);
   if(txt !== tlClockTxt){ tlClockTxt = txt; tlClock.textContent = txt; }
+  const digits = Math.max(2, String(Math.ceil(Math.max(tlLen, tlTime))).length);
+  if(digits !== tlClockDigits){ tlClockDigits = digits; tlClock.style.width = (digits * 1.45) + "em"; }
 }
 function tlMeasure(){
   const w = tlHeadLayer.clientWidth;
@@ -3256,6 +3591,7 @@ let tlLift = 0, tlTopPx = -1;
 function tlSyncTop(){
   const b = parseFloat(getComputedStyle(tlDock).bottom) || 0;
   const top = Math.round(b + tlDock.offsetHeight + tlLift);
+  hud.style.setProperty("--tl-base", Math.round(b + tlLift) + "px");   // the dock's bottom edge
   if(top === tlTopPx) return;
   tlTopPx = top;
   hud.style.setProperty("--tl-top", top + "px");
@@ -3290,6 +3626,7 @@ function tlSetOpen(v){
   } else {
     tlPointerIn = false;
     tlDisarmClear();
+    tlSel = null;
     /* Done editing: let it play. A playhead left parked behind a closed
        editor just looks like an animation that has stopped working. */
     if(!tlRunning) tlSetRunning(true);
@@ -3326,6 +3663,7 @@ tlPlay.addEventListener("click", e => {
 function tlSizeLen(){ tlLenIn.style.width = (Math.max(2, tlLenIn.value.length) * 1.45) + "em"; }
 function tlSetLen(L){
   tlLen = L;
+  tlV0 = 0; tlVL = 0;                    // a new length starts zoomed out
   tlLenIn.value = String(L);
   tlSizeLen();
   if(tlTime > tlLen) tlTime %= tlLen;
@@ -3342,6 +3680,7 @@ function tlCommitLen(){
   else { tlLenIn.value = String(n); tlSizeLen(); }
 }
 tlLenIn.addEventListener("input", tlSizeLen);
+tlInfBtn.addEventListener("click", e => { tlUnfocus(e); tlSetInf(!tlInf); tlNote(tlInf ? "limitless — plays once" : "loops at " + tlLen + "f"); });
 tlLenIn.addEventListener("keydown", e => {
   e.stopPropagation();                   // Space, R and Escape mean other things out there
   if(e.key === "Enter"){ e.preventDefault(); tlLenIn.blur(); }
@@ -3384,6 +3723,7 @@ tlClear.addEventListener("click", e => {
      mis-hit, not a decision. */
   if(Date.now() - tlArmedAt < TL_ARM_MIN_MS) return;
   tracks = {};
+  tlSel = null;
   tlSyncClear(); tlRender(); tlRefreshHint();
   tlNote("keyframes cleared");
 });
@@ -3392,6 +3732,7 @@ tlClear.addEventListener("click", e => {
    it is showing; if it is the knob last pressed, its lane stays as the draft. */
 function tlClearKnob(k){
   if(!tracks[k]) return;
+  if(tlSel && tlSel.k === k) tlSel = null;
   delete tracks[k];
   tlRender(); tlSyncClear(); tlRefreshHint();
   tlNote(TL_KEYABLE[k].def.label + " cleared");
@@ -3409,7 +3750,7 @@ function tlHitKey(k, x, w){
   if(!ks) return null;
   let best = null, bestD = TL_HIT + 0.001;
   ks.forEach(q => {
-    const d = Math.abs(q.t / tlLen * w - x);
+    const d = Math.abs(tlFrac(q.t) * w - x);
     if(d < bestD){ bestD = d; best = q; }
   });
   return best;
@@ -3418,7 +3759,7 @@ function tlHitKey(k, x, w){
    a key can be landed on exactly and edited, or lined up with another knob's,
    not missed by a pixel), else onto a whole second, else a whole frame. */
 function tlSnap(t, w, skip){
-  const ppf = w / tlLen;
+  const ppf = w / tlVLen();
   let best = null, bestD = TL_HIT + 0.001;
   for(const k in tracks) tracks[k].forEach(q => {
     if(q === skip) return;
@@ -3431,6 +3772,7 @@ function tlSnap(t, w, skip){
   return Math.round(t);
 }
 function tlRemoveKey(k, q){
+  if(tlSel && tlSel.q === q) tlSel = null;
   const ks = tracks[k];
   if(!ks) return;
   const i = ks.indexOf(q);
@@ -3455,6 +3797,7 @@ function tlRemoveKey(k, q){
      the delete — its own click, left entirely alone. */
 let tlLastPointer = "mouse";
 let tlSwallowClick = false;
+let tlLabTap = null;                      // the last still press on a name, for double-press
 tlTrack.addEventListener("pointerdown", e => {
   tlLastPointer = e.pointerType;
   tlSwallowClick = false;
@@ -3463,9 +3806,23 @@ tlTrack.addEventListener("pointerdown", e => {
   if(tg.closest(".tl-del")) return;
   const touch = e.pointerType === "touch";
   const onLab = !!tg.closest(".tl-lab");
-  if(onLab && !touch) return;
   const lane = tg.closest(".tl-lane");
   const k = (lane && lane.dataset.k) || null;
+  /* A lane's NAME is its knob's dial: press and drag up/down to turn it, with
+     the knob's own feel (same px-per-range, Shift for fine), through setValue
+     — so with the playhead parked it keys, exactly as turning the knob does.
+     A press that never moves is a click: it selects the knob. */
+  if(onLab){
+    if(!k) return;                        // the stand-in lane has no knob
+    const c = TL_KEYABLE[k];
+    tlGesture = {id:e.pointerId, x0:e.clientX, y0:e.clientY, k, c, mode:"dial",
+                 v0:P[k], moved:false, touch};
+    try{ tlTrack.setPointerCapture(e.pointerId); }catch(_){}
+    hovered = c; updateLegend();
+    dragCount++; wake();
+    e.preventDefault();
+    return;
+  }
   const g0 = tlGeom();
   const x = e.clientX - g0.left;
   const q = onLab ? null : tlHitKey(k, x, g0.w);
@@ -3478,8 +3835,12 @@ tlTrack.addEventListener("pointerdown", e => {
   if(!onLab){ try{ tlTrack.setPointerCapture(e.pointerId); }catch(_){} }
   dragCount++; wake();                    // held up for the length of the gesture
   if(!onLab) e.preventDefault();
+  /* Pressing a key selects it; pressing bare line (or a name) lets go. */
+  const selWas = tlSel;
+  tlSel = q ? {k, q} : (onLab ? tlSel : null);
+  if(tlSel !== selWas) tlRender();
   if(q){ tlSetRunning(false); tlSeek(q.t); }
-  else if(!touch){ tlSetRunning(false); tlSeek(tlClampT(tlSnap(x / g0.w * tlLen, g0.w))); }
+  else if(!touch){ tlSetRunning(false); tlSeek(tlClampT(tlSnap(tlV0 + x / g0.w * tlVLen(), g0.w))); }
 });
 tlTrack.addEventListener("pointermove", e => {
   const g = tlGesture;
@@ -3487,6 +3848,12 @@ tlTrack.addEventListener("pointermove", e => {
   const dx = e.clientX - g.x0, dy = e.clientY - g.y0;
   if(!g.moved && Math.abs(dx) < TL_SLOP && Math.abs(dy) < TL_SLOP) return;
   g.moved = true;
+  if(g.mode === "dial"){
+    const d = g.c.def, fine = e.shiftKey ? 0.2 : 1, up = g.y0 - e.clientY;
+    if(d.t === "sel") setValue(g.c, g.v0 + (up / 150) * (optionsOf(g.c).length - 1) * fine);
+    else setValue(g.c, g.v0 + (up / 190) * (d.max - d.min) * fine);
+    return;
+  }
   if(g.mode === "maybe"){
     const scrollable = tlTrack.scrollHeight > tlTrack.clientHeight + 1;
     g.mode = (Math.abs(dy) > Math.abs(dx) && scrollable) ? "scroll" : (g.onLab ? "none" : "scrub");
@@ -3494,7 +3861,7 @@ tlTrack.addEventListener("pointermove", e => {
   }
   if(g.mode === "scroll"){ tlTrack.scrollTop = g.scroll0 - dy; return; }
   if(g.mode === "scrub"){
-    tlSeek(tlClampT(tlSnap((e.clientX - g.left) / g.w * tlLen, g.w)));
+    tlSeek(tlClampT(tlSnap(tlV0 + (e.clientX - g.left) / g.w * tlVLen(), g.w)));
     return;
   }
   if(g.mode !== "key") return;
@@ -3502,7 +3869,7 @@ tlTrack.addEventListener("pointermove", e => {
      it, above or below, it goes back to where it was and turns faint: let go
      there and it is deleted, come back and it is not. */
   g.doomed = Math.abs(dy) > TL_DOOM;
-  const t = g.doomed ? g.t0 : tlClampT(tlSnap(g.t0 + dx / g.w * tlLen, g.w, g.q));
+  const t = g.doomed ? g.t0 : tlClampT(tlSnap(g.t0 + dx / g.w * tlVLen(), g.w, g.q));
   g.q.t = t;
   tracks[g.k].sort(byT);
   tlRender();
@@ -3514,11 +3881,27 @@ function tlEndGesture(e, cancelled){
   tlGesture = null;
   dragCount = Math.max(0, dragCount - 1);
   try{ tlTrack.releasePointerCapture(e.pointerId); }catch(_){}
-  if(g.onLab && g.moved) tlSwallowClick = true;     // that was a swipe, not a press
+  if(g.mode === "dial"){
+    // The capture retargets the click away from the name, so select here.
+    tlSwallowClick = true;
+    if(!g.moved && !cancelled){
+      /* Two still presses on one name inside 350ms send its knob home, as a
+         double-click on the knob does. (Detected here: the drag's capture
+         retargets the browser's own dblclick away from the name.) */
+      const now = Date.now();
+      if(tlLabTap && tlLabTap.k === g.k && now - tlLabTap.at < 350){
+        setValue(g.c, DEFAULTS[g.k]); tlLabTap = null;
+      } else tlLabTap = {k:g.k, at:now};
+      select(g.c);
+    }
+    if(g.touch && hovered === g.c){ hovered = null; updateLegend(); }   // a touch's "hover" ends with it
+    wake();
+    return;
+  }
   if(g.mode === "maybe" && !g.moved && !g.onLab && !cancelled){
     // A touch that never moved: a tap on the line.
     tlSetRunning(false);
-    tlSeek(tlClampT(tlSnap((g.x0 - g.left) / g.w * tlLen, g.w)));
+    tlSeek(tlClampT(tlSnap(tlV0 + (g.x0 - g.left) / g.w * tlVLen(), g.w)));
   }
   if(g.mode === "key" && g.moved && tracks[g.k]){
     if(cancelled){                        // the system took the gesture: put it back
@@ -3539,6 +3922,161 @@ function tlEndGesture(e, cancelled){
 }
 tlTrack.addEventListener("pointerup", e => tlEndGesture(e, false));
 tlTrack.addEventListener("pointercancel", e => tlEndGesture(e, true));
+
+/* Ctrl+wheel (Cmd on a Mac — and a trackpad pinch, which arrives as a
+   ctrl-wheel) ZOOMS the lanes about the pointer: the frame under it stays
+   under it. Shift+wheel, or a sideways trackpad swipe, pans a zoomed view.
+   A plain wheel is left alone, so it still scrolls the list of lanes. Zoomed
+   all the way out (the whole loop in view) the view resets to "everything",
+   so a later length change needs nothing special. Not passive: Ctrl+wheel
+   would otherwise zoom the whole PAGE. */
+const TL_MIN_VIEW = 12;                  // frames: the deepest zoom
+tlTrack.addEventListener("wheel", e => {
+  const zoom = e.ctrlKey || e.metaKey;
+  const pan = !zoom && tlVL > 0 && (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY));
+  if(!zoom && !pan) return;
+  e.preventDefault();
+  const g0 = tlGeom();
+  const x = Math.max(0, Math.min(g0.w, e.clientX - g0.left));
+  let vl = tlVLen(), v0 = tlV0;
+  const unit = e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? g0.w : 1;   // lines/pages -> px
+  if(zoom){
+    const at = v0 + x / g0.w * vl;
+    vl = Math.max(Math.min(TL_MIN_VIEW, tlLen), Math.min(tlLen, vl * Math.exp(e.deltaY * unit * 0.002)));
+    v0 = at - x / g0.w * vl;
+  } else {
+    v0 += (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY) * unit / g0.w * vl;
+  }
+  tlSetView(v0, vl);
+}, {passive:false});
+
+/* One place that commits a view: clamps it inside the loop, snaps "all of
+   it" back to 0/0, and redraws. The wheel and the pinch both end here. */
+function tlSetView(v0, vl){
+  vl = Math.max(Math.min(TL_MIN_VIEW, tlLen), Math.min(tlLen, vl));
+  v0 = Math.max(0, Math.min(tlLen - vl, v0));
+  if(vl >= tlLen - TL_EPS){ tlV0 = 0; tlVL = 0; }
+  else { tlV0 = v0; tlVL = vl; }
+  tlBuildRuler(); tlRender();
+  tlHeadPx = -1; tlDrawHead();
+}
+
+/* ---------- touch: pinch to zoom ----------
+   A phone's Ctrl+wheel. Two fingers on the lanes zoom about their midpoint
+   and pan with it — the frame between them stays between them, the way the
+   wheel keeps the frame under the pointer. Listened for in the CAPTURE phase
+   so it sees the second finger before the single-finger handlers do:
+   - the first finger's gesture is CANCELLED, not finished — a key it was
+     carrying goes back, a tap it might have been never happens;
+   - while two fingers are down, their events stop here;
+   - when one lifts, the other is left doing nothing until it lifts too:
+     it must not turn into a scrub or a tap wherever it happens to rest. */
+const tlTouches = new Map();              // pointerId -> {x, y}
+let tlPinch = null;
+function tlPinchGeom(){
+  const [a, b] = [...tlTouches.values()];
+  return {d: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)), cx: (a.x + b.x) / 2};
+}
+tlTrack.addEventListener("pointerdown", e => {
+  if(e.pointerType !== "touch") return;
+  tlTouches.set(e.pointerId, {x:e.clientX, y:e.clientY});
+  if(tlTouches.size === 2 && !tlPinch){
+    if(tlGesture) tlEndGesture({pointerId: tlGesture.id}, true);
+    tlSwallowClick = true;                // nor may a name's tap select anything
+    const g0 = tlGeom(), p = tlPinchGeom();
+    tlPinch = {d0:p.d, vl0:tlVLen(), at: tlV0 + (p.cx - g0.left) / g0.w * tlVLen()};
+    for(const id of tlTouches.keys()){ try{ tlTrack.setPointerCapture(id); }catch(_){} }
+    dragCount++; wake();
+  }
+  if(tlPinch || tlTouches.size > 1){ e.stopImmediatePropagation(); e.preventDefault(); }
+}, true);
+tlTrack.addEventListener("pointermove", e => {
+  if(!tlTouches.has(e.pointerId)) return;
+  tlTouches.set(e.pointerId, {x:e.clientX, y:e.clientY});
+  if(!tlPinch) return;
+  e.stopImmediatePropagation();
+  if(tlTouches.size < 2) return;          // the finger left behind: inert
+  const g0 = tlGeom(), p = tlPinchGeom();
+  const vl = tlPinch.vl0 * tlPinch.d0 / p.d;
+  tlSetView(tlPinch.at - (p.cx - g0.left) / g0.w * Math.max(Math.min(TL_MIN_VIEW, tlLen), Math.min(tlLen, vl)), vl);
+}, true);
+function tlTouchUp(e){
+  if(!tlTouches.has(e.pointerId)) return;
+  tlTouches.delete(e.pointerId);
+  if(!tlPinch) return;
+  e.stopImmediatePropagation();
+  if(tlTouches.size === 0){
+    tlPinch = null;
+    dragCount = Math.max(0, dragCount - 1);
+    wake();
+  }
+}
+tlTrack.addEventListener("pointerup", tlTouchUp, true);
+tlTrack.addEventListener("pointercancel", tlTouchUp, true);
+
+/* Hovering a lane's name shows its knob in the legend, as hovering the knob
+   does (mouse only — a touch's press does it via the dial above). Delegated,
+   since lanes are rebuilt constantly; a rebuild under a still pointer just
+   leaves the legend on the knob it was already showing. */
+tlRows.addEventListener("pointerover", e => {
+  if(e.pointerType === "touch") return;
+  const lab = e.target.closest(".tl-lab"), lane = lab && lab.closest(".tl-lane");
+  const c = lane && lane.dataset.k && TL_KEYABLE[lane.dataset.k];
+  if(!c || hovered === c) return;
+  hovered = c; updateLegend();
+});
+tlRows.addEventListener("pointerout", e => {
+  if(e.pointerType === "touch" || (tlGesture && tlGesture.mode === "dial")) return;
+  const lab = e.target.closest(".tl-lab");
+  if(!lab || (e.relatedTarget && lab.contains(e.relatedTarget))) return;
+  const lane = lab.closest(".tl-lane");
+  const c = lane && lane.dataset.k && TL_KEYABLE[lane.dataset.k];
+  if(c && hovered === c){ hovered = null; updateLegend(); }
+});
+/* ---------- resizing the panel ----------
+   Dragging the panel's top edge sets the lanes' window to an explicit height,
+   in place of the "six lanes" cap — taller to see more lanes at once,
+   shorter to give the fractal the screen. It is an inline height on the
+   scroller, so it beats every layout's cap (the phone sheet's three-lane
+   one included) until a double-click on the grip hands those caps back. Kept
+   between one lane and whatever still leaves the panel's header on screen. */
+const tlGripEl = document.getElementById("tlGrip");
+{
+  let gd = null;
+  tlGripEl.addEventListener("pointerdown", e => {
+    if(e.pointerType === "mouse" && e.button !== 0) return;
+    gd = {id:e.pointerId, y0:e.clientY, h0:tlTrack.clientHeight};
+    try{ tlGripEl.setPointerCapture(e.pointerId); }catch(_){}
+    tlGripEl.classList.add("dragging");
+    dragCount++; wake();
+    e.preventDefault();
+  });
+  tlGripEl.addEventListener("pointermove", e => {
+    if(!gd || e.pointerId !== gd.id) return;
+    const rows = parseFloat(getComputedStyle(tlTrack).getPropertyValue("--tl-row-h")) || 24;
+    const ruler = parseFloat(getComputedStyle(tlTrack).getPropertyValue("--tl-ruler-h")) || 17;
+    // Room above: the panel's top may rise to 8px under the screen's top.
+    const room = tlTrack.clientHeight + tlPanel.getBoundingClientRect().top - 8;
+    const h = Math.max(ruler + rows, Math.min(room, gd.h0 + (gd.y0 - e.clientY)));
+    tlTrack.style.height = tlTrack.style.maxHeight = Math.round(h) + "px";
+    tlSyncTop();
+  });
+  const end = e => {
+    if(!gd || e.pointerId !== gd.id) return;
+    gd = null;
+    tlGripEl.classList.remove("dragging");
+    dragCount = Math.max(0, dragCount - 1);
+    try{ tlGripEl.releasePointerCapture(e.pointerId); }catch(_){}
+    if(tlActiveK) tlReveal(tlActiveK);
+    wake();
+  };
+  tlGripEl.addEventListener("pointerup", end);
+  tlGripEl.addEventListener("pointercancel", end);
+  tlGripEl.addEventListener("dblclick", () => {
+    tlTrack.style.height = tlTrack.style.maxHeight = "";
+    tlSyncTop();
+  });
+}
 
 /* The name selects its knob (and so points the timeline at it); the × clears
    that knob's keys. Delegated, because the lanes are rebuilt all the time. */
@@ -3581,6 +4119,7 @@ tlTrack.addEventListener("keydown", e => {
   else if(e.key === "End") t = tlLen;
   else if(e.key === "Delete"){
     e.preventDefault();
+    if(tlSel){ tlRemoveKey(tlSel.k, tlSel.q); return; }
     const ks = tlHotK && tracks[tlHotK];
     const q = ks && ks.find(x => Math.abs(x.t - tlTime) < TL_EPS);
     if(q) tlRemoveKey(tlHotK, q);
@@ -3627,7 +4166,8 @@ function tlPresetText(){
     "A look and a keyframe timeline for [Fractal Crack](https://corruptioncorp.net/fractalcrack/).",
     "To load it, open the timeline (the square button, bottom left), press **Import** and choose this file.",
     "",
-    "- length: " + tlLen + " frames (" + TL_FPS + " a second)",
+    tlInf ? "- length: infinite (plays once, no loop; typed length " + tlLenBase + " frames)"
+          : "- length: " + tlLen + " frames (" + TL_FPS + " a second)",
     "",
     "## Knobs",
     "",
@@ -3687,7 +4227,14 @@ function tlParse(text){
       return;
     }
     const len = /^[-*]?\s*length\s*[:=]\s*(.+)$/i.exec(line);
-    if(len){ out.len = tlParseFrames(len[1]); return; }
+    if(len){
+      if(/inf|∞|limitless/i.test(len[1])){
+        out.inf = true;
+        const m = /typed length\s*([\d.]+)/i.exec(len[1]);
+        if(m) out.len = parseFloat(m[1]);
+      } else out.len = tlParseFrames(len[1]);
+      return;
+    }
     if(line.charAt(0) !== "|") return;
     const cellsT = line.replace(/^\|/, "").replace(/\|$/, "").split("|");
     let k = null;
@@ -3718,6 +4265,7 @@ function tlLoad(text){
     TL_ORDER.forEach(k => { P[k] = tlCoerce(TL_KEYABLE[k], k in d.knobs ? d.knobs[k] : DEFAULTS[k]); });
   }
   tracks = {};                            // lanes in the order the file first names them
+  tlSel = null;
   d.keys.forEach(r => {
     const t = Math.min(TL_MAX_LEN, Math.round(r.t));
     const v = tlCoerce(TL_KEYABLE[r.k], r.v);
@@ -3726,8 +4274,10 @@ function tlLoad(text){
     if(at) at.v = v; else ks.push({t, v});
   });
   for(const k in tracks) tracks[k].sort(byT);
+  tlSetInf(false);                        // settle the length first, then ∞ if the file asks
   const want = d.len > 0 ? Math.round(d.len) : tlLen;
   tlSetLen(Math.max(TL_MIN_LEN, Math.min(TL_MAX_LEN, Math.max(want, Math.ceil(tlLastKey() - TL_EPS)))));
+  if(d.inf) tlSetInf(true);
   refreshKnobs();
   scheduleAlloc();                       // Delay may have changed the ring's depth
   tlSyncClear();
@@ -3808,6 +4358,19 @@ window.addEventListener("resize", () => { if(tlOpen) tlMeasure(); tlSyncTop(); }
 tlSizeLen();
 tlSyncTop();
 
+/* Backspace or Delete removes the selected keyframe wherever focus is — a
+   key is selected with the pointer, so the keyboard must not need a focus
+   trip to the list first. Capture phase, so it answers before photo mode's
+   Backspace; never while typing in a box, where both keys edit text. */
+window.addEventListener("keydown", e => {
+  if(!tlOpen || !tlSel || (e.key !== "Backspace" && e.key !== "Delete")) return;
+  const t = e.target;
+  if(t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+  if(!tracks[tlSel.k] || tracks[tlSel.k].indexOf(tlSel.q) < 0){ tlSel = null; return; }
+  e.preventDefault(); e.stopPropagation();
+  tlRemoveKey(tlSel.k, tlSel.q);
+}, true);
+
 /* ---------- owner gate ----------
    The timeline editor is for the site's owners only. This app has no Firebase
    of its own, but it shares the site's ORIGIN, and Firebase Auth persists per
@@ -3861,6 +4424,7 @@ function tlSetAdmin(on){
   if(hud.classList.contains("tl-admin") === on) return;
   hud.classList.toggle("tl-admin", on);
   if(!on && tlOpen) tlSetOpen(false);
+  if(on && tlSaved && tlSaved.open && !tlOpen) tlSetOpen(true);   // reopen as it was left
   tlSyncTop();
 }
 async function tlCheckOwner(){
@@ -3876,6 +4440,55 @@ async function tlCheckOwner(){
   }catch(_){ /* offline or blocked: the editor simply stays hidden */ }
 }
 setTimeout(tlCheckOwner, 1500);
+
+/* ---------- persistence ----------
+   The timeline survives a refresh and a return visit: saved to localStorage
+   as the SAME Markdown the Export button writes (so one format, one parser —
+   tlPresetText / tlLoad), plus whether the editor was open and the height
+   the grip left it at. Written whenever the page is being left or hidden
+   (pagehide + visibilitychange: iOS never fires beforeunload) and, debounced,
+   after edits, so a crash loses at most a second. With no keyframes left the
+   entry is REMOVED rather than saved: the knobs are the visitor's own
+   business, and restoring a look nobody animated would be a surprise.
+   Restoring runs tlLoad, which restarts the playhead from frame 0. Per
+   browser, per device — the Export file is how a timeline travels.
+   Every storage call is guarded: private windows and blocked site data
+   throw, and a timeline that cannot be saved must still work. */
+const TL_STORE = "fc-timeline-v1";
+let tlSaved = null, tlSaveTimer = null;
+function tlSaveNow(){
+  clearTimeout(tlSaveTimer);
+  try{
+    if(!tlHasKeys()){ localStorage.removeItem(TL_STORE); return; }
+    localStorage.setItem(TL_STORE, JSON.stringify({
+      md: tlPresetText(), open: tlOpen, h: tlTrack.style.height || ""
+    }));
+  }catch(_){}
+}
+function tlSaveSoon(){ clearTimeout(tlSaveTimer); tlSaveTimer = setTimeout(tlSaveNow, 1000); }
+window.addEventListener("pagehide", tlSaveNow);
+document.addEventListener("visibilitychange", () => { if(document.hidden) tlSaveNow(); });
+/* Edits reach the save through the places they already end up: a render (keys
+   added, moved, deleted, cleared, lanes changed), a length or ∞ change, the
+   editor opening or closing, and the grip. Cheap to over-call — debounced. */
+["pointerup", "keyup", "change"].forEach(ev => tlPanel.addEventListener(ev, tlSaveSoon));
+document.getElementById("knobPanel").addEventListener("pointerup", tlSaveSoon);
+tlToggle.addEventListener("click", tlSaveSoon);
+/* Restored in a MICROTASK, i.e. once this whole script has run (still before
+   the first frame): tlLoad reaches scheduleAlloc, whose timer is a `let`
+   declared further down, and touching it here threw from the temporal dead
+   zone — the keys came back but everything after the throw (the height)
+   silently didn't. */
+Promise.resolve().then(() => {
+  try{
+    const raw = localStorage.getItem(TL_STORE);
+    if(!raw) return;
+    tlSaved = JSON.parse(raw);
+    if(tlSaved && tlSaved.md && tlLoad(tlSaved.md) !== null){
+      if(tlSaved.h) tlTrack.style.height = tlTrack.style.maxHeight = tlSaved.h;
+    } else tlSaved = null;
+  }catch(_){ tlSaved = null; }
+});
 
 /* ------------------------------------------------------------------ */
 /*  Double-click defences                                              */
