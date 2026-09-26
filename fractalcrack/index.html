@@ -1893,7 +1893,19 @@ initGL();
 const RING_MAX = 16;
 let ring = [];
 let W = 0, H = 0, head = 0;
-function ringNeed(){ return Math.max(2, Math.min(RING_MAX, (P.delayFrames|0) + 2)); }
+/* A Delay the TIMELINE drives is sized for the deepest key it will reach, not
+   for wherever the playhead happens to be. Sized to the live value, an
+   animated Delay rebuilt the whole ring at every whole frame it crossed —
+   sixteen targets made, the picture blitted across, the old ones freed —
+   which is a visible hitch per step, i.e. a stutter for as long as the
+   animation ran. Every change to that track schedules a rebuild (setValue,
+   tlLoad, and the three places keys are removed), so this is re-read then. */
+function ringNeed(){
+  let d = P.delayFrames | 0;
+  const ks = tracks.delayFrames;
+  if(ks) for(const q of ks) d = Math.max(d, Math.round(q.v));
+  return Math.max(2, Math.min(RING_MAX, d + 2));
+}
 
 function makeTarget(w, h){
   const tex = gl.createTexture();
@@ -2054,6 +2066,14 @@ let pulse = 0;                      // decaying one shot
 let drawHold = 0;                   // sustained while the right button is down
 let customTex = null, hasCustom = 0;
 const startT = performance.now();
+/* True once the hud has FINISHED fading out (idle, or photo mode) — set by
+   its opacity transitionend, cleared by wake(). While it holds, nothing in
+   the hud is written: a playing timeline would otherwise rotate knob hands
+   (each inside a drop-shadowed cell, so a filter re-raster apiece), rewrite
+   the legend and walk the playhead sixty times a second behind opacity 0 —
+   exactly while someone is watching the clean frame in photo mode. wake()
+   brings it all up to date before the fade back in. */
+let hudGone = false, hudStale = false;
 
 /* Keyframe timeline state — declared up here, not with the rest of it (see
    "Keyframe timeline" further down), because wake() and the legend read it,
@@ -2224,7 +2244,7 @@ function frame(now){
      image identical to the one already on screen — and while PAUSED, all of
      them did. */
   if(stepped || dirty){ present(); dirty = false; }
-  if(tlOpen) tlDrawHead();
+  if(tlOpen && !hudGone) tlDrawHead();   // diffs against what it last wrote, so it catches up on its own
 }
 /* A tab coming back to the front has been composited by someone else in the
    meantime; redraw once rather than trusting what is left on the canvas. */
@@ -2394,23 +2414,28 @@ GROUPS.forEach(g => {
   if(!isControls) knobPanelEl.appendChild(col);
 });
 
-function refreshHands(){
-  /* Called on EVERY value change, which during a drag is every pointermove.
-     Writing a transform into all twenty-nine hands each time repainted all
-     twenty-nine drop-shadowed cells to move exactly one of them. Compare the
-     string that would be written — floats out of angleFor() differ in noise
-     the rendered value doesn't. */
-  cells.forEach(c => {
-    if(!c.hand) return;
-    const deg = angleFor(c).toFixed(2);
-    if(deg === c.deg) return;
-    c.deg = deg;
-    c.hand.style.transform = "rotate(" + deg + "deg)";
-  });
+/* Writing a transform into all twenty-nine hands each time repainted all
+   twenty-nine drop-shadowed cells to move exactly one of them. Compare the
+   string that would be written — floats out of angleFor() differ in noise
+   the rendered value doesn't. */
+function setHand(c){
+  const deg = angleFor(c).toFixed(2);
+  if(deg === c.deg) return;
+  c.deg = deg;
+  c.hand.style.transform = "rotate(" + deg + "deg)";
+}
+/* `only` is a set of knob keys ({k: true}): the timeline passes the ones it
+   moved this tick, so a playing animation formats one or two angles a tick
+   rather than all twenty-nine. */
+function refreshHands(only){
   dirty = true;                       // a display knob may have moved the frame
+  if(hudGone){ hudStale = true; return; }
+  if(only){ for(const k in only) setHand(TL_KEYABLE[k]); return; }
+  cells.forEach(c => { if(c.hand) setHand(c); });
 }
 function refreshKnobs(){
   refreshHands();
+  if(hudGone) return;                 // hudStale is set; wake() redraws the legend
   if(legendTarget()) drawLegend(legendTarget());
 }
 
@@ -2505,26 +2530,52 @@ function lgSave(){ try{ localStorage.setItem(LG_STORE, JSON.stringify(lgState));
 
 function legendTarget(){ return hovered || selected; }
 
+/* The legend is redrawn on every value change — every pointermove of a knob
+   drag, and every tick of a timeline animating the knob it shows — so it
+   writes only what differs from what is already there. A write of the SAME
+   text still replaces the text node and dirties style and layout, and a
+   picker's option row used to be torn down and rebuilt each time. */
+function setText(el, s){ if(el.textContent !== s) el.textContent = s; }
+function setCls(el, name, on){ if(el.classList.contains(name) !== on) el.classList.toggle(name, on); }
+let lgCell = null, lgOptsSig = "";
+
 function drawLegend(c){
   if(editingCell && editingCell !== c) cancelEditValue(); // switched target mid-edit: discard, don't guess at a commit
-  legend.style.setProperty("--accent", c.group.accent);
-  lgGroup.textContent = c.def.t === "hdr" ? "Section" : c.group.name;
-  lgTitle.textContent = c.def.label;
-  lgOpts.textContent = "";
+  if(c !== lgCell){
+    lgCell = c;
+    legend.style.setProperty("--accent", c.group.accent);
+    setText(lgGroup, c.def.t === "hdr" ? "Section" : c.group.name);
+    setText(lgTitle, c.def.label);
+  }
   const locked = (selected === c);
 
   if(c.def.t === "knob"){
-    if(editingCell !== c) lgValue.textContent = c.def.fmt(P[c.def.k]);
-    lgValue.classList.remove("lg-selval", "lg-none");
-    lgValue.classList.toggle("editable", locked);
+    if(editingCell !== c) setText(lgValue, c.def.fmt(P[c.def.k]));
+    setCls(lgValue, "lg-selval", false);
+    setCls(lgValue, "lg-none", false);
+    setCls(lgValue, "editable", locked);
   } else if(c.def.t === "sel"){
     /* A picker's value is its option buttons below; the value line carries
        the current option's name too, shown only when the legend is condensed
        to one line (where the buttons are hidden). */
-    lgValue.textContent = optionsOf(c)[P[c.def.k]] || "";
-    lgValue.classList.remove("lg-none", "editable");
-    lgValue.classList.add("lg-selval");
-    optionsOf(c).forEach((name, i) => {
+    setText(lgValue, optionsOf(c)[P[c.def.k]] || "");
+    setCls(lgValue, "lg-none", false);
+    setCls(lgValue, "editable", false);
+    setCls(lgValue, "lg-selval", true);
+  } else {
+    /* buttons carry no value modifier */
+    setText(lgValue, "");
+    setCls(lgValue, "lg-selval", false);
+    setCls(lgValue, "editable", false);
+    setCls(lgValue, "lg-none", true);
+  }
+  /* The option row belongs to one picker at one value: rebuilt only when that
+     changes (or an uploaded shape adds "custom" to the list). */
+  const sig = c.def.t === "sel" ? c.def.k + "|" + P[c.def.k] + "|" + optionsOf(c).length : "";
+  if(sig !== lgOptsSig){
+    lgOptsSig = sig;
+    lgOpts.textContent = "";
+    if(sig) optionsOf(c).forEach((name, i) => {
       const b = document.createElement("button");
       b.type = "button";
       b.textContent = name;
@@ -2537,24 +2588,20 @@ function drawLegend(c){
       });
       lgOpts.appendChild(b);
     });
-  } else {
-    /* buttons carry no value modifier */
-    lgValue.textContent = "";
-    lgValue.classList.remove("lg-selval", "editable");
-    lgValue.classList.add("lg-none");
   }
-  lgLock.textContent = locked
+  setText(lgLock, locked
     ? (c.def.t === "sel" ? "locked — click an option"
        : c.def.t === "knob" ? "locked — drag, or tap the value to type one"
        : "")
-    : "";
-  lgTl.textContent = tlHint(c);
-  lgClose.hidden = !locked;           // only offer it when there is a lock to release
-  legend.classList.add("show");
+    : "");
+  setText(lgTl, tlHint(c));
+  if(lgClose.hidden === locked) lgClose.hidden = !locked;   // only offer it when there is a lock to release
+  setCls(legend, "show", true);
   tlSyncFocus();
 }
 function hideLegend(){
-  cancelEditValue(); legend.classList.remove("show"); lgClose.hidden = true;
+  cancelEditValue(); setCls(legend, "show", false);
+  if(!lgClose.hidden) lgClose.hidden = true;
   tlSyncFocus();
 }
 
@@ -2635,14 +2682,25 @@ lgValue.addEventListener("click", e => {
 function setValue(c, val){
   const d = c.def;
   const before = P[d.k];
+  let v;
   if(d.t === "sel"){
     const n = optionsOf(c).length;
-    P[d.k] = Math.max(0, Math.min(n-1, Math.round(val)));
+    v = Math.max(0, Math.min(n-1, Math.round(val)));
   } else {
-    let v = Math.max(d.min, Math.min(d.max, val));
+    v = Math.max(d.min, Math.min(d.max, val));
     v = Math.round(v / d.step) * d.step;
     v = Math.max(d.min, Math.min(d.max, v));
-    P[d.k] = parseFloat(v.toPrecision(10));
+    v = parseFloat(v.toPrecision(10));
+  }
+  /* Only a real CHANGE goes any further. A drag reports every pointermove,
+     most of which land on the value already set (the step is coarser than a
+     pixel, and a click that merely selects a knob jitters a pixel or two on
+     the way) — and each of those used to redraw every hand and the legend,
+     and, on Resolution, throw the adaptive quality back to full. Every caller
+     that needs the legend redrawn regardless goes on to select() it. */
+  if(v === before) return;
+  P[d.k] = v;
+  if(d.t !== "sel"){
     /* Both of these change what has to be allocated: res the size of every
        target, delayFrames how many of them there are. Debounced through
        scheduleAlloc so dragging a knob across its range rebuilds once at the
@@ -2655,9 +2713,8 @@ function setValue(c, val){
   refreshKnobs();
   /* Every hand on a knob comes through here — drag, wheel, arrow keys, a
      typed value, a picked option, a double-click home — so this is the one
-     place the timeline needs to hear about it. Only a real CHANGE keys: a
-     click that merely selects a knob jitters a pixel or two on the way. */
-  if(P[d.k] !== before) tlOnKnob(c, before);
+     place the timeline needs to hear about it. */
+  tlOnKnob(c, before);
 }
 
 function wire(c){
@@ -2977,6 +3034,13 @@ cvs.addEventListener("pointercancel", releaseTouch);
 /* ------------------------------------------------------------------ */
 const hud = document.getElementById("hud");
 let idleTimer = null;
+/* The fade finished with the hud still idle: it is invisible now, so the
+   writes described at hudGone can stop. A fade reversed half-way ends with
+   the class gone and changes nothing. (Under reduced motion there is no
+   transition and so no event — the hud then simply keeps being updated.) */
+hud.addEventListener("transitionend", e => {
+  if(e.target === hud && e.propertyName === "opacity" && hud.classList.contains("idle")) hudGone = true;
+});
 /* The hud hides after two idle seconds whatever is selected. Two things hold
    it open: an adjustment actually in progress, and a value being typed into
    the legend. That second one matters on every platform — the legend lives
@@ -3047,6 +3111,13 @@ function wake(){
   const held = sheetOpen();
   if(anyDown() && !held){ hud.classList.add("idle"); return; } // stays hidden until release
   hud.classList.remove("idle");
+  if(hudGone){
+    /* Coming back from fully faded: bring what was skipped up to date before
+       the fade in paints anything. The playhead needs nothing — tlDrawHead
+       diffs against what it last wrote, and the next frame runs it again. */
+    hudGone = false;
+    if(hudStale){ hudStale = false; refreshHands(); updateLegend(); }
+  }
   clearTimeout(idleTimer);
   /* A mouse resting on the open timeline holds it too, for the sheet's
      reason: it is somewhere you work, and a still pointer over it is someone
@@ -3080,12 +3151,17 @@ function sheetTabH(){
 function sheetTravel(){ return Math.max(0, knobPanelEl.offsetHeight - sheetTabH()); }
 // f = 0 shut, 1 open. The sheet is only written inline mid-drag; at rest its
 // class-driven CSS owns it (so the 105% hide still clears its shadow).
-function placeSheet(f, dragging){
-  const travel = sheetTravel();
+/* Mid-drag the travel comes in from the drag, measured once at pointerdown:
+   the sheet cannot change height under a finger, and measuring it here meant
+   reading layout straight after the previous move's transforms were written
+   — a forced style + layout on every pointermove, twice over with the dock's
+   own measurement in tlRide. */
+function placeSheet(f, dragging, travel){
+  if(travel === undefined) travel = sheetTravel();
   knobHandle.style.transform = `translateY(${-f * travel}px)`;
   // The sheet's top rides the tab's top: shut, it tucks exactly under the tab.
   knobPanelEl.style.transform = dragging ? `translateY(${(1 - f) * travel}px)` : "";
-  tlRide(f * travel);                  // the timeline dock rides the sheet's edge too
+  tlRide(f * travel, !dragging);       // the timeline dock rides the sheet's edge too
 }
 function setKnobsOpen(open){
   hud.classList.toggle("knobs-open", open);
@@ -3101,9 +3177,10 @@ function setKnobsOpen(open){
   knobHandle.addEventListener("pointerdown", e => {
     if(drag) return;
     drag = { id: e.pointerId, y0: e.clientY, f0: hud.classList.contains("knobs-open") ? 1 : 0,
-             lastY: e.clientY, lastT: e.timeStamp, v: 0, moved: false };
+             lastY: e.clientY, lastT: e.timeStamp, v: 0, moved: false, travel: sheetTravel() };
     drag.f = drag.f0;
-    knobHandle.setPointerCapture(e.pointerId);
+    tlSyncTop();                       // the dock's resting place, measured once for the drag
+    try{ knobHandle.setPointerCapture(e.pointerId); }catch(_){}   // as everywhere else: a throw must not strand the drag half set up
     hud.classList.add("knobs-dragging");
     wake();
   });
@@ -3111,12 +3188,11 @@ function setKnobsOpen(open){
     if(!drag || e.pointerId !== drag.id) return;
     const dy = e.clientY - drag.y0;
     if(Math.abs(dy) > TAP_SLOP_PX) drag.moved = true;
-    const travel = sheetTravel() || 1;
-    drag.f = Math.min(1, Math.max(0, drag.f0 - dy / travel));
+    drag.f = Math.min(1, Math.max(0, drag.f0 - dy / (drag.travel || 1)));
     const dt = e.timeStamp - drag.lastT;
     if(dt > 0) drag.v = (e.clientY - drag.lastY) / dt;   // px/ms, +ve = downward
     drag.lastY = e.clientY; drag.lastT = e.timeStamp;
-    placeSheet(drag.f, true);
+    placeSheet(drag.f, true, drag.travel);
   });
   const end = cancelled => e => {
     if(!drag || e.pointerId !== drag.id) return;
@@ -3295,16 +3371,20 @@ function tlApply(){
     const v = tlCoerce(c, tlValueAt(tracks[k], tlTime, c.def.t === "sel"));
     if(v === P[k]) continue;
     P[k] = v;
-    if(k === "delayFrames") scheduleAlloc();   // the ring's depth follows it
+    /* No scheduleAlloc for delayFrames: the ring is already as deep as the
+       deepest key on its track (see ringNeed), so riding the keys needs no
+       rebuild at all. */
     (changed || (changed = {}))[k] = true;
   }
   if(!changed) return;
-  refreshHands();
+  refreshHands(changed);
   /* The legend only when it is showing a knob that moved: redrawing a PICKER
      rebuilds its option buttons, and doing that every tick would pull them out
      from under a click. */
   const lt = legendTarget();
-  if(lt && changed[lt.def.k]) drawLegend(lt);
+  if(lt && changed[lt.def.k]){
+    if(hudGone) hudStale = true; else drawLegend(lt);
+  }
 }
 
 function tlTick(){
@@ -3387,7 +3467,13 @@ function tlActivate(c){
    look you had and arrives at the new one at the frame you picked. */
 function tlOnKnob(c, before){
   if(TL_KEYABLE[c.def.k] !== c) return;
-  tlActivate(c);
+  /* Only when it is a DIFFERENT knob. This runs on every value change — every
+     pointermove of a drag — and tlActivate's reveal reads the lanes' layout,
+     straight after the hand and the legend were written: a forced layout per
+     move. Pressing a knob (pointerdown, select) already activated and
+     revealed it; a change that arrives any other way (the wheel on a hovered
+     knob, a lane name dialled) is a new knob and still takes this branch. */
+  if(c.def.k !== tlActiveK) tlActivate(c);
   if(!tlOpen || tlRunning) return;
   const k = c.def.k;
   let keys = tracks[k], added = false;
@@ -3416,6 +3502,7 @@ function tlRefreshHint(){
 /* Which lane glows: the knob the legend is showing (a hover, a lock), else
    the one last pressed. Only classes change — hovering must never rebuild. */
 let tlLaneEls = {};                       // knob key -> its lane element
+let tlKeyEls = new Map();                 // keyframe -> its diamond, while it is drawn
 let tlHotK = null;
 function tlSyncFocus(){
   const c = legendTarget();
@@ -3490,6 +3577,7 @@ function tlLaneEl(k){
         if(f < -0.001 || f > 1.001) return;           // zoomed out of view
         d.style.left = (f * 100) + "%";
         line.appendChild(d);
+        tlKeyEls.set(q, d);
       });
     }
   }
@@ -3504,6 +3592,7 @@ function tlRender(){
   const ks = tlLaneKeys();
   const frag = document.createDocumentFragment();
   tlLaneEls = {};
+  tlKeyEls = new Map();
   if(!ks.length) frag.appendChild(tlLaneEl(null));
   ks.forEach(k => { const el = tlLaneEl(k); tlLaneEls[k] = el; frag.appendChild(el); });
   tlRows.textContent = "";
@@ -3514,7 +3603,9 @@ function tlRender(){
    covers the top of the scrollport, so "in view" starts below it. */
 function tlReveal(k){
   const el = tlLaneEls[k];
-  if(!el) return;
+  // Closed, the lanes left over from the last opening are display:none —
+  // measuring them would force a layout to learn nothing.
+  if(!el || !tlOpen) return;
   const rh = tlTrack.firstElementChild.firstElementChild.offsetHeight;   // the ruler row
   const top = el.offsetTop - rh, bottom = el.offsetTop + el.offsetHeight;
   if(top < tlTrack.scrollTop) tlTrack.scrollTop = top;
@@ -3587,21 +3678,32 @@ function tlMeasure(){
    --tl-top — what the legend stacks itself on (see its rule). Measured from
    layout, not getBoundingClientRect, because mid-ride the rect is somewhere
    in a transition and the number wanted is where it is going. */
-let tlLift = 0, tlTopPx = -1;
-function tlSyncTop(){
-  const b = parseFloat(getComputedStyle(tlDock).bottom) || 0;
-  const top = Math.round(b + tlDock.offsetHeight + tlLift);
-  hud.style.setProperty("--tl-base", Math.round(b + tlLift) + "px");   // the dock's bottom edge
-  if(top === tlTopPx) return;
-  tlTopPx = top;
-  hud.style.setProperty("--tl-top", top + "px");
+/* Both are written on the LEGEND, the only thing that reads them, and only
+   when they change. They used to go on .hud, and an inherited custom property
+   changed on the root restyles every element under it — the whole console,
+   on every pointermove of a sheet drag, which is when this changes most.
+   `fresh === false` reuses the last measurement of the dock (its computed
+   bottom and its height): a drag moves the dock by transform only, so neither
+   changes under it, and reading them per move forced a layout each time.
+   Anything that CAN change them — a resize, the panel opening, the grip, the
+   ResizeObserver on the dock — calls this without it. */
+let tlLift = 0, tlTopPx = -1, tlBasePx = -1, tlDockB = 0, tlDockH = 0;
+function tlSyncTop(fresh){
+  if(fresh !== false){
+    tlDockB = parseFloat(getComputedStyle(tlDock).bottom) || 0;
+    tlDockH = tlDock.offsetHeight;
+  }
+  const base = Math.round(tlDockB + tlLift);             // the dock's bottom edge
+  const top = Math.round(tlDockB + tlDockH + tlLift);
+  if(base !== tlBasePx){ tlBasePx = base; legend.style.setProperty("--tl-base", base + "px"); }
+  if(top !== tlTopPx){ tlTopPx = top; legend.style.setProperty("--tl-top", top + "px"); }
 }
 /* Called by placeSheet with how far the pull bar has risen. Only the phone
    layout has a sheet to ride. */
-function tlRide(lift){
+function tlRide(lift, fresh){
   tlLift = SHEET_MQ.matches ? lift : 0;
   tlDock.style.transform = tlLift ? "translateY(" + (-tlLift) + "px)" : "";
-  tlSyncTop();
+  tlSyncTop(fresh);
 }
 
 let tlMsgTimer = null;
@@ -3724,6 +3826,7 @@ tlClear.addEventListener("click", e => {
   if(Date.now() - tlArmedAt < TL_ARM_MIN_MS) return;
   tracks = {};
   tlSel = null;
+  scheduleAlloc();                       // a Delay track may have been holding the ring deep
   tlSyncClear(); tlRender(); tlRefreshHint();
   tlNote("keyframes cleared");
 });
@@ -3734,6 +3837,7 @@ function tlClearKnob(k){
   if(!tracks[k]) return;
   if(tlSel && tlSel.k === k) tlSel = null;
   delete tracks[k];
+  if(k === "delayFrames") scheduleAlloc();   // the ring can shrink back to the knob's own value
   tlRender(); tlSyncClear(); tlRefreshHint();
   tlNote(TL_KEYABLE[k].def.label + " cleared");
 }
@@ -3778,6 +3882,7 @@ function tlRemoveKey(k, q){
   const i = ks.indexOf(q);
   if(i >= 0) ks.splice(i, 1);
   if(!ks.length) delete tracks[k];
+  if(k === "delayFrames") scheduleAlloc();   // its deepest key may have been this one
   tlRender(); tlSyncClear(); tlApply(); tlRefreshHint();
   tlNote("keyframe removed");
 }
@@ -3872,7 +3977,14 @@ tlTrack.addEventListener("pointermove", e => {
   const t = g.doomed ? g.t0 : tlClampT(tlSnap(g.t0 + dx / g.w * tlVLen(), g.w, g.q));
   g.q.t = t;
   tracks[g.k].sort(byT);
-  tlRender();
+  /* Move the one diamond rather than rebuilding every lane per pointermove.
+     A key dragged out of a zoomed view has no diamond to move — that one
+     falls back to the rebuild, which leaves it out. */
+  const el = tlKeyEls.get(g.q), f = tlFrac(t);
+  if(el && el.isConnected && f >= -0.001 && f <= 1.001){
+    el.style.left = (f * 100) + "%";
+    setCls(el, "doomed", g.doomed);
+  } else tlRender();
   tlSeek(t);
 });
 function tlEndGesture(e, cancelled){
@@ -3952,13 +4064,24 @@ tlTrack.addEventListener("wheel", e => {
 
 /* One place that commits a view: clamps it inside the loop, snaps "all of
    it" back to 0/0, and redraws. The wheel and the pinch both end here. */
+/* The redraw is deferred to the next animation frame: a trackpad pinch or a
+   free-spinning wheel delivers several events per frame, and each one used to
+   rebuild the ruler (hundreds of notches) and every lane for a picture only
+   the last would ever show. The VIEW itself is committed at once — hits,
+   snaps and the next event's maths all read tlV0/tlVL, never the DOM. */
+let tlViewQueued = false;
 function tlSetView(v0, vl){
   vl = Math.max(Math.min(TL_MIN_VIEW, tlLen), Math.min(tlLen, vl));
   v0 = Math.max(0, Math.min(tlLen - vl, v0));
   if(vl >= tlLen - TL_EPS){ tlV0 = 0; tlVL = 0; }
   else { tlV0 = v0; tlVL = vl; }
-  tlBuildRuler(); tlRender();
-  tlHeadPx = -1; tlDrawHead();
+  if(tlViewQueued) return;
+  tlViewQueued = true;
+  requestAnimationFrame(() => {
+    tlViewQueued = false;
+    tlBuildRuler(); tlRender();
+    tlHeadPx = -1; tlDrawHead();
+  });
 }
 
 /* ---------- touch: pinch to zoom ----------
@@ -4045,7 +4168,18 @@ const tlGripEl = document.getElementById("tlGrip");
   let gd = null;
   tlGripEl.addEventListener("pointerdown", e => {
     if(e.pointerType === "mouse" && e.button !== 0) return;
-    gd = {id:e.pointerId, y0:e.clientY, h0:tlTrack.clientHeight};
+    /* Everything the drag is bounded by is measured HERE, once. The room above
+       is the track's height plus the panel's top — a sum the drag cannot
+       change, since the panel is anchored by its bottom and every px the track
+       gains, its top loses. Measured per move, it forced a layout right after
+       the previous move's height was written. */
+    const cs = getComputedStyle(tlTrack);
+    const rows = parseFloat(cs.getPropertyValue("--tl-row-h")) || 24;
+    const ruler = parseFloat(cs.getPropertyValue("--tl-ruler-h")) || 17;
+    const h0 = tlTrack.clientHeight;
+    gd = {id:e.pointerId, y0:e.clientY, h0, min:ruler + rows,
+          // Room above: the panel's top may rise to 8px under the screen's top.
+          room:h0 + tlPanel.getBoundingClientRect().top - 8};
     try{ tlGripEl.setPointerCapture(e.pointerId); }catch(_){}
     tlGripEl.classList.add("dragging");
     dragCount++; wake();
@@ -4053,13 +4187,11 @@ const tlGripEl = document.getElementById("tlGrip");
   });
   tlGripEl.addEventListener("pointermove", e => {
     if(!gd || e.pointerId !== gd.id) return;
-    const rows = parseFloat(getComputedStyle(tlTrack).getPropertyValue("--tl-row-h")) || 24;
-    const ruler = parseFloat(getComputedStyle(tlTrack).getPropertyValue("--tl-ruler-h")) || 17;
-    // Room above: the panel's top may rise to 8px under the screen's top.
-    const room = tlTrack.clientHeight + tlPanel.getBoundingClientRect().top - 8;
-    const h = Math.max(ruler + rows, Math.min(room, gd.h0 + (gd.y0 - e.clientY)));
+    const h = Math.max(gd.min, Math.min(gd.room, gd.h0 + (gd.y0 - e.clientY)));
     tlTrack.style.height = tlTrack.style.maxHeight = Math.round(h) + "px";
-    tlSyncTop();
+    // The ResizeObserver on the dock restacks the legend after layout, with no
+    // forced layout here; without one, it has to be done by hand.
+    if(!window.ResizeObserver) tlSyncTop();
   });
   const end = e => {
     if(!gd || e.pointerId !== gd.id) return;
@@ -4376,8 +4508,10 @@ window.addEventListener("keydown", e => {
    of its own, but it shares the site's ORIGIN, and Firebase Auth persists per
    origin — so whoever is signed in on corruptioncorp.net is signed in here.
    Auth is loaded on demand from Google's CDN (same SDK version and config as
-   the site's src/firebase.js) AFTER the page is up, so visitors pay nothing
-   on the critical path. The account's email is compared by SHA-256 against
+   the site's src/firebase.js) AFTER the page is up — and only when the
+   session Firebase left on disk could be an owner's (see "looking before
+   downloading" below), so a visitor never downloads it at all. The
+   account's email is compared by SHA-256 against
    the same two digests src/accountData.js ships (keep them in step — see
    CLAUDE.md, "The owner accounts"); the address itself never appears here.
    UI gating only: there is nothing privileged behind it to protect. */
@@ -4427,19 +4561,113 @@ function tlSetAdmin(on){
   if(on && tlSaved && tlSaved.open && !tlOpen) tlSetOpen(true);   // reopen as it was left
   tlSyncTop();
 }
+const tlIsOwnerEmail = email =>
+  !!email && TL_ADMIN_SHA256.indexOf(tlSha256(String(email).trim().toLowerCase())) >= 0;
+
+let tlFbStarted = false;
 async function tlCheckOwner(){
+  if(tlFbStarted) return;
+  tlFbStarted = true;
   try{
     const [{ initializeApp }, { getAuth, onAuthStateChanged }] = await Promise.all([
       import(TL_FB + "firebase-app.js"), import(TL_FB + "firebase-auth.js")]);
     const auth = getAuth(initializeApp(TL_FB_CONFIG));
     onAuthStateChanged(auth, u => {
       // An anonymous session (the graffiti wall's) is not an account.
-      const email = u && !u.isAnonymous && u.email ? u.email.trim().toLowerCase() : "";
-      tlSetAdmin(!!email && TL_ADMIN_SHA256.indexOf(tlSha256(email)) >= 0);
+      tlSetAdmin(!!u && !u.isAnonymous && tlIsOwnerEmail(u.email));
     });
   }catch(_){ /* offline or blocked: the editor simply stays hidden */ }
 }
-setTimeout(tlCheckOwner, 1500);
+
+/* ---------- looking before downloading ----------
+   The SDK above is 258 KB of JavaScript (64 KB on the wire) — fetched, parsed
+   and run on EVERY visit, 1.5s in, i.e. on a phone as a main-thread hitch
+   right over the running fractal, to answer a question whose answer for all
+   but two people is "no". So first read the answer off the disk: Firebase
+   persists the signed-in user in this origin's IndexedDB
+   (firebaseLocalStorageDb / firebaseLocalStorage, one record per auth
+   instance, keyed firebase:authUser:<apiKey>:[DEFAULT], holding the user's
+   toJSON() — email and isAnonymous included). The site, Pinballa and the
+   graffiti wall all write it there, since they share this origin.
+     "no"     nothing that could be an owner: no database, no user, only an
+              anonymous one, or one whose email is not an owner's. The SDK is
+              never loaded.
+     "owner"  the editor comes up at once, and the SDK is still loaded (it is
+              only the owners who pay for it now) so a sign-out, or a session
+              the server has revoked, takes it away again live.
+     "unsure" anything this does not recognise — an error, a record of an
+              unknown shape, a key nothing here expects. The SDK decides, which
+              is exactly what used to happen for everyone. A change to
+              Firebase's storage format therefore costs the saving, never the
+              owners their editor.
+   A "no" is looked at again when the tab comes back to the front, so signing
+   in on the site in another tab and returning here still brings the editor. */
+const TL_IDB = "firebaseLocalStorageDb", TL_IDB_STORE = "firebaseLocalStorage";
+function tlPeekRecords(recs){
+  let verdict = "no";
+  for(const r of recs){
+    const key = r && r.fbase_key;
+    if(key === "__sak") continue;             // Firebase's own "is storage writable" probe
+    if(typeof key !== "string" || key.indexOf("firebase:authUser:") !== 0) return "unsure";
+    const u = r.value;
+    if(!u || typeof u !== "object" || typeof u.isAnonymous !== "boolean") return "unsure";
+    if(!u.isAnonymous && tlIsOwnerEmail(u.email)) verdict = "owner";
+  }
+  return verdict;
+}
+function tlPeekAuth(){
+  /* The two other persistences Firebase can fall back to, cheapest first. */
+  try{
+    for(const st of [localStorage, sessionStorage]){
+      for(let i = 0; i < st.length; i++){
+        const k = st.key(i);
+        if(k && k.indexOf("firebase:authUser:") === 0) return Promise.resolve("unsure");
+      }
+    }
+  }catch(_){}
+  if(!window.indexedDB) return Promise.resolve("unsure");
+  return new Promise(resolve => {
+    let req;
+    try{ req = indexedDB.open(TL_IDB, 1); }catch(_){ resolve("unsure"); return; }
+    /* An upgrade means the database does not exist: nobody has ever signed in
+       on this origin in this browser. Abort it, so looking never CREATES the
+       database — Firebase would cope with finding an empty one (it deletes and
+       remakes it), but it should never have to. */
+    let absent = false;
+    req.onupgradeneeded = e => {
+      absent = e.oldVersion === 0;
+      try{ req.transaction.abort(); }catch(_){}
+    };
+    req.onerror = e => { if(e && e.preventDefault) e.preventDefault(); resolve(absent ? "no" : "unsure"); };
+    req.onblocked = () => resolve("unsure");
+    req.onsuccess = () => {
+      const db = req.result;
+      const done = v => { try{ db.close(); }catch(_){} resolve(v); };
+      try{
+        if(!db.objectStoreNames.contains(TL_IDB_STORE)){ done("no"); return; }
+        const get = db.transaction(TL_IDB_STORE, "readonly").objectStore(TL_IDB_STORE).getAll();
+        get.onsuccess = () => done(tlPeekRecords(get.result || []));
+        get.onerror = () => done("unsure");
+      }catch(_){ done("unsure"); }
+    };
+  });
+}
+let tlPeeking = false;
+async function tlOwnerGate(){
+  if(tlFbStarted || tlPeeking) return;        // once the SDK runs, it owns the answer
+  tlPeeking = true;
+  let v;
+  try{ v = await tlPeekAuth(); }catch(_){ v = "unsure"; }
+  tlPeeking = false;
+  if(v === "no"){ tlSetAdmin(false); return; }
+  if(v === "owner") tlSetAdmin(true);
+  /* The editor is already up for an owner, so the SDK can wait until the page
+     has settled; "unsure" keeps the old timing too. */
+  setTimeout(tlCheckOwner, 1500);
+}
+tlOwnerGate();
+document.addEventListener("visibilitychange", () => { if(!document.hidden) tlOwnerGate(); });
+window.addEventListener("focus", tlOwnerGate);
 
 /* ---------- persistence ----------
    The timeline survives a refresh and a return visit: saved to localStorage
@@ -4456,13 +4684,22 @@ setTimeout(tlCheckOwner, 1500);
    throw, and a timeline that cannot be saved must still work. */
 const TL_STORE = "fc-timeline-v1";
 let tlSaved = null, tlSaveTimer = null;
+/* What storage was last left holding (null: nothing; undefined: not known
+   yet). The save is triggered by every knob release, for every visitor —
+   the knob sheet's pointerup below — and with no timeline at all that was a
+   synchronous localStorage removeItem a second after each one, forever. A
+   write now happens only when there is something different to write. */
+let tlStoredJson;
 function tlSaveNow(){
   clearTimeout(tlSaveTimer);
   try{
-    if(!tlHasKeys()){ localStorage.removeItem(TL_STORE); return; }
-    localStorage.setItem(TL_STORE, JSON.stringify({
+    const json = tlHasKeys() ? JSON.stringify({
       md: tlPresetText(), open: tlOpen, h: tlTrack.style.height || ""
-    }));
+    }) : null;
+    if(json === tlStoredJson) return;
+    if(json === null) localStorage.removeItem(TL_STORE);
+    else localStorage.setItem(TL_STORE, json);
+    tlStoredJson = json;
   }catch(_){}
 }
 function tlSaveSoon(){ clearTimeout(tlSaveTimer); tlSaveTimer = setTimeout(tlSaveNow, 1000); }
@@ -4482,6 +4719,7 @@ tlToggle.addEventListener("click", tlSaveSoon);
 Promise.resolve().then(() => {
   try{
     const raw = localStorage.getItem(TL_STORE);
+    tlStoredJson = raw;
     if(!raw) return;
     tlSaved = JSON.parse(raw);
     if(tlSaved && tlSaved.md && tlLoad(tlSaved.md) !== null){
