@@ -1,0 +1,1 @@
+import{f as o,x as n,d as r,a as c}from"./firebase-BuCgUe5i.js";const a=["corruptioncorp.net","www.corruptioncorp.net"];let t=!1;function s(){if(t||(t=!0,!a.includes(location.hostname)))return;const e=Math.floor(Date.now()/864e5);o(r(c,"siteStats",String(e)),{views:n(1)},{merge:!0}).catch(()=>{})}export{s as countPageView};
