@@ -577,14 +577,20 @@ body{
   pointer-events:none;
 }
 .hud:not(.idle) #tlToggle,
+.hud:not(.idle) #tlChaos,
 .hud:not(.idle) #tlPanel{ pointer-events:auto }
-/* Owners only: the dock stays out of the page until the script has matched
-   the signed-in account against the owner digests (see "Owner gate"). */
-.hud:not(.tl-admin) #tlDock{ display:none }
+/* The editor is a Corruption Corp CHAOS perk. Until the script has matched the
+   signed-in account as a member (see "Chaos gate"), the toggle and the panel
+   stay out of the page and #tlChaos stands in the toggle's place: the same
+   plate and icon with a padlock on it, linking to the Chaos page. A member
+   gets the real toggle and never sees the link. */
+.hud:not(.tl-admin) #tlToggle,
+.hud:not(.tl-admin) #tlPanel,
+.hud.tl-admin #tlChaos{ display:none }
 
 /* The square toggle — the exit plate's clothes (light plate, #505050 ring),
    inverted while the editor is open so the state reads at a glance. */
-#tlToggle{
+#tlToggle, #tlChaos{
   flex:0 0 auto;
   width:var(--tl-btn); height:var(--tl-btn);
   display:grid; place-items:center;
@@ -597,9 +603,21 @@ body{
   box-shadow:0 2px 8px rgba(0,0,0,.65);
   transition:background .15s ease, border-color .15s ease, color .15s ease;
 }
-#tlToggle svg{ width:64%; height:64%; display:block; pointer-events:none }
+#tlToggle svg, #tlChaos svg{ width:64%; height:64%; display:block; pointer-events:none }
+/* The link's padlock, on the plate's top-right corner — the same badge a
+   locked cell wears on the site. */
+#tlChaos{ position:relative; text-decoration:none }
+#tlChaos .tl-chaos-lock{
+  position:absolute; top:-7px; right:-7px;
+  width:18px; height:18px;
+  display:grid; place-items:center;
+  border-radius:50%;
+  background:#111; color:#f2f2f2;
+  box-shadow:0 0 0 2px #f2f2f2;
+}
+#tlChaos .tl-chaos-lock svg{ width:11px; height:11px }
 @media (hover:hover) and (pointer:fine){
-  #tlToggle:hover{ background:#fff; border-color:#000 }
+  #tlToggle:hover, #tlChaos:hover{ background:#fff; border-color:#000 }
   .hud.tl-open #tlToggle:hover{ background:#000; border-color:#fff }
 }
 .hud.tl-open #tlToggle{ background:#111; color:#f2f2f2; border-color:#f2f2f2 }
@@ -710,6 +728,7 @@ body{
 }
 .tl-b:disabled{ opacity:.32; cursor:default }
 #tlToggle:focus-visible,
+#tlChaos:focus-visible,
 .tl-b:focus-visible,
 .tl-lab:focus-visible,
 .tl-del:focus-visible,
@@ -1015,7 +1034,7 @@ body{
 #tlTrack{ scrollbar-color:#c9ced6 transparent }
 #tlTrack::-webkit-scrollbar-thumb{ background:#c9ced6 }
 #tlGrip::after{ background:#c9ced6 }
-#tlToggle:focus-visible, .tl-b:focus-visible, .tl-lab:focus-visible,
+#tlToggle:focus-visible, #tlChaos:focus-visible, .tl-b:focus-visible, .tl-lab:focus-visible,
 .tl-del:focus-visible, #tlTrack:focus-visible{ outline-color:#000 }
 @media (hover:hover) and (pointer:fine){
   .tl-b:hover:not(:disabled), .tl-del:hover{ border-color:var(--accent, #000); color:#1a1d24 }
@@ -1294,7 +1313,7 @@ body{
   /* The toggle stays up with the sheet open — it rides with the panel, so
      the editor can be shut from there. It paints above the controls strip,
      in the one case (a short phone) where the two can meet. */
-  #tlToggle{ position:relative; z-index:1 }
+  #tlToggle, #tlChaos{ position:relative; z-index:1 }
   /* Riding an open sheet, the panel has the sheet's height under it and the
      top bar above it; three lanes, fewer on a short phone, then it scrolls. */
   .hud.knobs-open #tlTrack{
@@ -1362,7 +1381,7 @@ body{
 }
 
 @media (prefers-reduced-motion:reduce){
-  .hud,#legend,.cell::after,#fc-splash,#photoHint,#ccExit,#tlToggle,.tl-line,#tlMsg{transition:none}
+  .hud,#legend,.cell::after,#fc-splash,#photoHint,#ccExit,#tlToggle,#tlChaos,.tl-line,#tlMsg{transition:none}
   .fc-splash-loader,.hud.tl-open #tlPanel{animation:none}
 }
 @media (prefers-reduced-motion:reduce) and (max-width:900px) and (orientation:portrait){
@@ -1421,10 +1440,25 @@ body{
     <div class="lg-lock" id="lgLock"></div>
     <div class="lg-lock lg-tl" id="lgTl"></div>
   </div>
-  <!-- Keyframe timeline. The toggle is always there; the panel is display:none
-       until it is opened. Everything in here is wired in the script's
-       "Keyframe timeline" section. -->
+  <!-- Keyframe timeline — a Corruption Corp CHAOS perk. For a member the
+       toggle is there and the panel is display:none until it is opened; for
+       everyone else #tlChaos stands in the toggle's place and links to the
+       Chaos page (see "Chaos gate" in the script). Everything else in here is
+       wired in the script's "Keyframe timeline" section. -->
   <div id="tlDock">
+    <a id="tlChaos" href="/chaos?return=%2Ffractalcrack"
+       aria-label="Keyframe editor — a Corruption Corp Chaos perk"
+       title="Keyframe editor — a Corruption Corp Chaos perk">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M3 17h18"/>
+        <path d="M8 7.5V21"/>
+        <path d="M5 4h6l-3 3.5z" fill="currentColor"/>
+        <path d="M16 13.5l3.5 3.5-3.5 3.5-3.5-3.5z" fill="currentColor"/>
+      </svg>
+      <span class="tl-chaos-lock" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><rect x="4" y="10.4" width="16" height="11.1" rx="2.2" fill="currentColor"/><path d="M7.9 10.4V7.3a4.1 4.1 0 0 1 8.2 0v3.1" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>
+      </span>
+    </a>
     <button id="tlToggle" type="button" aria-expanded="false" aria-controls="tlPanel"
             aria-label="Keyframe timeline" title="Keyframe timeline">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -4503,17 +4537,27 @@ window.addEventListener("keydown", e => {
   tlRemoveKey(tlSel.k, tlSel.q);
 }, true);
 
-/* ---------- owner gate ----------
-   The timeline editor is for the site's owners only. This app has no Firebase
-   of its own, but it shares the site's ORIGIN, and Firebase Auth persists per
-   origin — so whoever is signed in on corruptioncorp.net is signed in here.
+/* ---------- Chaos gate ----------
+   The timeline editor is a Corruption Corp CHAOS perk: a member's (role
+   'chaos', or 'admin', which includes it) and the site's owners'. This app has
+   no Firebase of its own, but it shares the site's ORIGIN, and Firebase Auth
+   persists per origin — so whoever is signed in on corruptioncorp.net is
+   signed in here. Two ways to be let in:
+     - an OWNER: the account's email is compared by SHA-256 against the same
+       two digests src/accountData.js ships (keep them in step — see
+       docs/notes/locked-menus-and-accounts.md, "The owner accounts"); the
+       address itself never appears here;
+     - a MEMBER: the role the site and Pinballa remember per account in this
+       origin's localStorage (`cc-role-<uid>`, written whenever either of them
+       sees the account's userRoles document — see accountData.js). This app
+       never reads Firestore itself; a member who has been on the site since
+       being granted Chaos already has the hint, and the Chaos page this
+       app's link opens IS the site, so following it once is enough.
    Auth is loaded on demand from Google's CDN (same SDK version and config as
    the site's src/firebase.js) AFTER the page is up — and only when the
-   session Firebase left on disk could be an owner's (see "looking before
-   downloading" below), so a visitor never downloads it at all. The
-   account's email is compared by SHA-256 against
-   the same two digests src/accountData.js ships (keep them in step — see
-   CLAUDE.md, "The owner accounts"); the address itself never appears here.
+   session Firebase left on disk could be a member's (see "looking before
+   downloading" below), so a visitor never downloads it at all. Everyone else
+   gets #tlChaos, a link to the Chaos page that comes back here.
    UI gating only: there is nothing privileged behind it to protect. */
 const TL_ADMIN_SHA256 = [
   "2ac91c1187b9c06118f5afd6f8505f531d921319ecd6b8ad77ad291b11cc9c09", // personal
@@ -4563,6 +4607,15 @@ function tlSetAdmin(on){
 }
 const tlIsOwnerEmail = email =>
   !!email && TL_ADMIN_SHA256.indexOf(tlSha256(String(email).trim().toLowerCase())) >= 0;
+/* The remembered role for this account (see the note above). */
+const tlIsMemberUid = uid => {
+  if(!uid) return false;
+  try{ const r = localStorage.getItem("cc-role-" + uid); return r === "chaos" || r === "admin"; }
+  catch(_){ return false; }
+};
+const tlLetIn = u => !!u && !u.isAnonymous && (tlIsOwnerEmail(u.email) || tlIsMemberUid(u.uid));
+let tlUser = null;          // the SDK's last report, once it is running
+let tlUserKnown = false;    // ...and whether it has made one yet
 
 let tlFbStarted = false;
 async function tlCheckOwner(){
@@ -4574,7 +4627,8 @@ async function tlCheckOwner(){
     const auth = getAuth(initializeApp(TL_FB_CONFIG));
     onAuthStateChanged(auth, u => {
       // An anonymous session (the graffiti wall's) is not an account.
-      tlSetAdmin(!!u && !u.isAnonymous && tlIsOwnerEmail(u.email));
+      tlUser = u; tlUserKnown = true;
+      tlSetAdmin(tlLetIn(u));
     });
   }catch(_){ /* offline or blocked: the editor simply stays hidden */ }
 }
@@ -4611,7 +4665,7 @@ function tlPeekRecords(recs){
     if(typeof key !== "string" || key.indexOf("firebase:authUser:") !== 0) return "unsure";
     const u = r.value;
     if(!u || typeof u !== "object" || typeof u.isAnonymous !== "boolean") return "unsure";
-    if(!u.isAnonymous && tlIsOwnerEmail(u.email)) verdict = "owner";
+    if(tlLetIn(u)) verdict = "owner";
   }
   return verdict;
 }
@@ -4654,7 +4708,11 @@ function tlPeekAuth(){
 }
 let tlPeeking = false;
 async function tlOwnerGate(){
-  if(tlFbStarted || tlPeeking) return;        // once the SDK runs, it owns the answer
+  /* Once the SDK runs, it owns WHO is signed in — but the role hint can still
+     change under it (the site, in this tab's history or another tab, granting
+     or dropping Chaos), so the answer is re-read here. */
+  if(tlFbStarted){ if(tlUserKnown) tlSetAdmin(tlLetIn(tlUser)); return; }
+  if(tlPeeking) return;
   tlPeeking = true;
   let v;
   try{ v = await tlPeekAuth(); }catch(_){ v = "unsure"; }
@@ -4668,6 +4726,22 @@ async function tlOwnerGate(){
 tlOwnerGate();
 document.addEventListener("visibilitychange", () => { if(!document.hidden) tlOwnerGate(); });
 window.addEventListener("focus", tlOwnerGate);
+/* Back from the Chaos page by the history, a bfcache restore runs no script
+   and fires no visibilitychange — but it does fire pageshow. And the site in
+   another tab writing a role hint arrives as a storage event. */
+window.addEventListener("pageshow", e => { if(e.persisted) tlOwnerGate(); });
+window.addEventListener("storage", e => { if(!e.key || e.key.indexOf("cc-role-") === 0) tlOwnerGate(); });
+
+/* The link to the Chaos page, for everyone the gate above did not let in. Its
+   ?return= is wherever this app was opened from (/fractalcrack, or the raw
+   /fractalcrack/index.html), so the page's Back button lands back here. */
+const tlChaos = document.getElementById("tlChaos");
+if(tlChaos){
+  tlChaos.addEventListener("click", e => {
+    e.preventDefault();
+    location.assign("/chaos?return=" + encodeURIComponent(location.pathname + location.search));
+  });
+}
 
 /* ---------- persistence ----------
    The timeline survives a refresh and a return visit: saved to localStorage

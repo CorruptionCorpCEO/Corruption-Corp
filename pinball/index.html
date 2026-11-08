@@ -94,8 +94,8 @@
             to { transform: rotate(360deg); }
         }
     </style>
-  <script type="module" crossorigin src="/pinball/assets/index-Dq7vqcUL.js"></script>
-  <link rel="stylesheet" crossorigin href="/pinball/assets/index-B_lAVx_O.css">
+  <script type="module" crossorigin src="/pinball/assets/index-BXMH10dj.js"></script>
+  <link rel="stylesheet" crossorigin href="/pinball/assets/index-C2sIWCRL.css">
 </head>
 <body>
     <div id="pinballa-splash" role="status" aria-label="Loading">
@@ -205,11 +205,11 @@
                     <button id="btn-clear-bg" class="btn btn-danger">Clear Background</button>
                 </div>
 
-                <div id="admin-palette-box" hidden>
-                    <div class="ss-cat">Colours (admin testing)</div>
+                <div id="admin-palette-box">
+                    <div class="ss-cat">Theme</div>
                     <div class="ss-row ss-row-inline">
                         <span class="slider-label">Palette</span>
-                        <select id="admin-palette" class="field" aria-label="Colour palette"></select>
+                        <select id="admin-palette" class="field" aria-label="Colour theme"></select>
                     </div>
                 </div>
 
@@ -219,10 +219,12 @@
                 </div>
                 </div></div>
 
-            <div class="panel-section profile-opt accent-green" id="chaos-settings" hidden>
+            <div class="panel-section profile-opt accent-green chaos-locked" id="chaos-settings">
                 <button type="button" id="btn-dd-chaos" class="dd-plain-header" data-tilt aria-expanded="false" aria-controls="chaos-settings-body">
                     Chaos settings <span class="dd-plain-arrow">&#9662;</span>
+                    <span class="chaos-lock" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="10.4" width="16" height="11.1" rx="2.2" fill="currentColor"/><path d="M7.9 10.4V7.3a4.1 4.1 0 0 1 8.2 0v3.1" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></span>
                 </button>
+                <p class="chaos-locked-note">Custom colours, your own logo and menu buttons — Corruption Corp Chaos, $3/month.</p>
                 <div id="chaos-settings-body" class="dd-plain-body">
                 <div class="ss-cat">Machine colours</div>
                 <div class="ss-color-grid">
@@ -240,6 +242,11 @@
                 </div>
                 <div class="ss-cat">Menus</div>
                 <label class="ss-check"><input type="checkbox" id="admin-invert-menus"><span>Invert menu colours</span></label>
+
+                <div class="ss-cat">Site logo</div>
+                <div id="chaos-art-logo" class="chaos-art-list"></div>
+                <div class="ss-cat">Menu buttons</div>
+                <div id="chaos-art-buttons" class="chaos-art-list"></div>
 
                 <div class="ss-cat">Name</div>
                 <label class="ss-check"><input type="checkbox" id="admin-name-rainbow"><span>Rainbow name (public)</span></label>
