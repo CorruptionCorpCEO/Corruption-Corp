@@ -177,12 +177,12 @@ body{
    row, to vertically centre the two against each other. */
 #topBar{ display:contents }
 
-/* ---------- back to Corruption Corp ----------
-   The same control Pinballa carries, in the same two-step shape: this app
-   fills the tab, so following the link is a one-way trip out of it and an
-   accidental press is expensive. The first press swaps the mark for EXIT?,
-   the second navigates (see the script). A real <a href="/"> so it
-   middle-clicks, long-presses and previews like any other link.
+/* ---------- the Corruption Corp MP3 button ----------
+   The same control Pinballa carries. It was the two-step way back to the site
+   (EXIT?); it is now the site's MP3 button, always (the owner, 2026-11-19):
+   /hud/mp3-host.js shows the site's MP3 module over this app — the site's
+   own, opened from its Programs menu, or one of this page's own, opened
+   directly — and the way back to the site is the logo under that module.
 
    Plate colours are Pinballa's — black line art on a light plate — which is
    also the only readable option here: cclogo.png is black, and this app's
@@ -249,28 +249,6 @@ body{
   object-fit:contain;
   pointer-events:none;
 }
-/* Armed: the mark is replaced by the word IN THE SAME BOX, so the plate never
-   changes size between the two states. */
-#ccExit .cc-confirm{
-  display:none;
-  font-family:inherit;
-  /* Sized off the plate's WIDTH, because width is what constrains it — the old
-     0.3-of-the-HEIGHT ran "EXIT?" 157px wide inside a 115px content box, i.e.
-     21px over each edge, which is why it read as filling the button end to end.
-     Note that adding padding to THIS element could never have fixed that: it is
-     a centred flex item, so its own padding is invisible until the text
-     overflows, and by then it is already too late. The plate's 8.5% horizontal
-     padding was there the whole time.
-     Measured for CRENZO at letter-spacing .06em: "EXIT?" renders about 5.7x the
-     font size, and the content box is about 0.8x the plate width, so 0.11x
-     leaves the text at roughly 78% of the box with real space either side. Any
-     change to the face or the wording wants that ratio re-measured. */
-  font-size:clamp(11px, calc(var(--cc-exit-w) * 0.11), 24px);
-  font-weight:700; letter-spacing:.06em;
-  color:inherit;
-}
-#ccExit.confirming img{display:none}
-#ccExit.confirming .cc-confirm{display:block}
 
 /* ---------- logo ---------- */
 #logo{
@@ -1421,12 +1399,9 @@ body{
     <!-- LAST in the bar on purpose: on a phone #topBar is a real flex row, so
          DOM order is what puts this at the right-hand end, and on every other
          viewport it positions itself into the top-right corner anyway.
-         Two-step: the first press swaps the mark for EXIT?, the second follows
-         the link. Leaving is a one-way trip out of the app, so an accidental
-         press is expensive. Same control, same contract, as Pinballa's. -->
-    <a id="ccExit" href="/" title="Back to Corruption Corp" aria-label="Back to Corruption Corp">
-      <img src="/hud/cclogo.png" alt="Corruption Corp" draggable="false">
-      <span class="cc-confirm" aria-hidden="true">EXIT?</span>
+         The site's MP3 button (see the #ccExit CSS and the script). -->
+    <a id="ccExit" href="/" title="Music player" aria-label="Music player">
+      <img src="/hud/mp3-button.svg" alt="Music player" draggable="false">
     </a>
   </div>
   <div id="legend" role="status" aria-live="polite">
@@ -3253,40 +3228,19 @@ function setKnobsOpen(open){
   window.addEventListener("resize", () => placeSheet(hud.classList.contains("knobs-open") ? 1 : 0, false));
 }
 /* ------------------------------------------------------------------ */
-/*  Back to Corruption Corp — a two-step, same contract as Pinballa's  */
+/*  The Corruption Corp MP3 button (was the two-step EXIT? link)       */
 /*                                                                     */
-/*  Following the link is a one-way trip out of the app, and the plate  */
-/*  sits right beside the logo (which on a phone is the knob sheet's    */
-/*  toggle), so the first press only ARMS it — the mark becomes EXIT? — */
-/*  and the second one navigates.                                      */
+/*  /hud/mp3-host.js does the work: opened from the site's Programs    */
+/*  menu (?cc-embed=1) it asks the site for its MP3 module; opened     */
+/*  directly it shows one of this page's own. A plain press only —     */
+/*  a modified click still follows the href to the site.               */
 /* ------------------------------------------------------------------ */
 const ccExit = document.getElementById("ccExit");
 if(ccExit){
-  const ARM_MS = 3000;      // armed this long, then it forgets
-  const MIN_MS = 350;       // ...but not answerable sooner than this
-  let armedAt = 0;
-  let armTimer = null;
-  const disarm = () => {
-    armedAt = 0;
-    ccExit.classList.remove("confirming");
-    ccExit.setAttribute("aria-label", "Back to Corruption Corp");
-    clearTimeout(armTimer);
-  };
   ccExit.addEventListener("click", e => {
-    // A modified click is "open it over there", not "leave" — hand it straight
-    // to the browser without arming anything.
     if(e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
-    /* MIN_MS is what stops a DOUBLE-CLICK walking straight through the confirm
-       — two presses inside the same gesture are one mis-hit, not a decision. */
-    if(armedAt && Date.now() - armedAt >= MIN_MS) return;   // second press: navigate
     e.preventDefault();
-    armedAt = Date.now();
-    ccExit.classList.add("confirming");
-    // The label has to move with it, or a screen reader still announces "Back
-    // to Corruption Corp" while the button is asking a question.
-    ccExit.setAttribute("aria-label", "Press again to leave Fractal Crack");
-    clearTimeout(armTimer);
-    armTimer = setTimeout(disarm, ARM_MS);
+    if(window.ccOpenMp3) window.ccOpenMp3();
   });
 }
 
@@ -4739,6 +4693,13 @@ const tlChaos = document.getElementById("tlChaos");
 if(tlChaos){
   tlChaos.addEventListener("click", e => {
     e.preventDefault();
+    /* Embedded in the site (ProgramFrame), the Chaos page is the SITE's: go
+       there in the whole tab, coming back to the program's own route —
+       inside this frame it would load the whole site within the app. */
+    if(new URLSearchParams(location.search).has("cc-embed") && window.parent !== window){
+      window.top.location.assign("/chaos?return=" + encodeURIComponent(window.top.location.pathname));
+      return;
+    }
     location.assign("/chaos?return=" + encodeURIComponent(location.pathname + location.search));
   });
 }
@@ -4900,5 +4861,6 @@ hideSplashWhenDressed();
 
 })();
 </script>
+<script src="/hud/mp3-host.js"></script>
 </body>
 </html>

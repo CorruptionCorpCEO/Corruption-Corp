@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 62">
+  <!-- The MP3 button the programs (Pinballa, Fractal Crack) show in place of
+       their Corruption Corp plate (see /hud/mp3-host.js): a little player —
+       screen with its track lines, and the play button. Drawn like cclogo.png,
+       WHITE shapes in a black outline, so it reads on Pinballa's dark plate
+       and Fractal Crack's light one alike. -->
+  <rect x="6" y="6" width="84" height="50" rx="9" fill="none" stroke="#000" stroke-width="10"/>
+  <rect x="6" y="6" width="84" height="50" rx="9" fill="none" stroke="#fff" stroke-width="4.5"/>
+  <rect x="15" y="15" width="38" height="32" rx="3" fill="#fff" stroke="#000" stroke-width="3"/>
+  <rect x="20" y="22" width="28" height="4" rx="2" fill="#000"/>
+  <rect x="20" y="30" width="19" height="3" rx="1.5" fill="#000"/>
+  <rect x="20" y="37" width="23" height="3" rx="1.5" fill="#000"/>
+  <circle cx="72" cy="31" r="11" fill="none" stroke="#000" stroke-width="8"/>
+  <circle cx="72" cy="31" r="11" fill="none" stroke="#fff" stroke-width="3.5"/>
+  <path d="M68.5 24.5 L79 31 L68.5 37.5 Z" fill="#fff" stroke="#000" stroke-width="2" stroke-linejoin="round"/>
+</svg>

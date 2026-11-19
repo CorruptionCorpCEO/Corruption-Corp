@@ -31,11 +31,11 @@
     <meta property="og:title" content="MixPass — Corruption Corp" />
     <meta property="og:description" content="StreetPass for music taste. MixPass is a cross-platform iOS and Android app with a late-2000s Frutiger Aero / Nintendo Wii Menu aesthetic that connects local…" />
     <meta property="og:url" content="https://corruptioncorp.net/mixpass/" />
-    <meta property="og:image" content="https://corruptioncorp.net/assets/mixpass-cover-DtzAUgmq.png" />
+    <meta property="og:image" content="https://corruptioncorp.net/assets/logo-BcBw4Vsn.png" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="MixPass — Corruption Corp" />
     <meta name="twitter:description" content="StreetPass for music taste. MixPass is a cross-platform iOS and Android app with a late-2000s Frutiger Aero / Nintendo Wii Menu aesthetic that connects local…" />
-    <meta name="twitter:image" content="https://corruptioncorp.net/assets/mixpass-cover-DtzAUgmq.png" />
+    <meta name="twitter:image" content="https://corruptioncorp.net/assets/logo-BcBw4Vsn.png" />
     <meta name="theme-color" content="#e8e8e8" />
     <!-- seo:end -->
     <script type="application/ld+json">
@@ -83,6 +83,25 @@
         window.dispatchEvent(new Event('cc-install-done'))
       })
     </script>
+    <style>
+      /* A fresh landing opens on the BLACK loading splash: paint the page black
+         before any CSS or JS has loaded, so it never flashes the light grey
+         first. App drops the class once the splash has gone. */
+      html.cc-boot,
+      html.cc-boot body {
+        background: #000 !important; /* over html.cc-dark's, whichever loads last */
+      }
+    </style>
+    <script>
+      // The splash shows on a fresh main-menu landing (App's showSplash): the
+      // bare / with no menu restored from this tab. (A /<slug> link holds the
+      // splash too, but may be a menu route that has none — left light.)
+      try {
+        var v = JSON.parse(sessionStorage.getItem('cc-view') || 'null')
+        if (location.pathname === '/' && !(v && v.activeKey))
+          document.documentElement.classList.add('cc-boot')
+      } catch (e) {}
+    </script>
     <script>
       // Paint the background dark BEFORE React mounts when dark mode is saved,
       // so a refresh in dark mode never flashes the light background first.
@@ -110,11 +129,13 @@
         }
       } catch (e) {}
     </script>
-    <script type="module" crossorigin src="/assets/index-SShbt-kh.js"></script>
-    <link rel="modulepreload" crossorigin href="/assets/vendor-VJxLuCUA.js">
-    <link rel="stylesheet" crossorigin href="/assets/index-CBy3uZqG.css">
+    <script type="module" crossorigin src="/assets/main-CyYl0D9k.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/react-Caa_6pmN.js">
+    <link rel="modulepreload" crossorigin href="/assets/styles-DK-ir5y_.js">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-1MV8fnq0.js">
+    <link rel="stylesheet" crossorigin href="/assets/styles-DF6C8fqx.css">
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"></div>
   </body>
 </html>

@@ -93,9 +93,9 @@
         @keyframes pinballaSplashSpin {
             to { transform: rotate(360deg); }
         }
-    </style>
-  <script type="module" crossorigin src="/pinball/assets/index-BXMH10dj.js"></script>
-  <link rel="stylesheet" crossorigin href="/pinball/assets/index-C2sIWCRL.css">
+    </style>
+  <script type="module" crossorigin src="/pinball/assets/index-C96ZzwIV.js"></script>
+  <link rel="stylesheet" crossorigin href="/pinball/assets/index-DU8hZGjF.css">
 </head>
 <body>
     <div id="pinballa-splash" role="status" aria-label="Loading">
@@ -164,16 +164,6 @@
                     Site Settings <span class="dd-plain-arrow">&#9662;</span>
                 </button>
                 <div id="site-settings-body" class="dd-plain-body">
-                <div class="ss-cat">Audio</div>
-                <div class="ss-row">
-                    <span class="slider-label">Music volume: <span id="music-vol-val">50</span>%</span>
-                    <input type="range" id="music-volume" min="0" max="100" value="50">
-                </div>
-                <div class="ss-row">
-                    <span class="slider-label">SFX volume: <span id="sfx-vol-val">50</span>%</span>
-                    <input type="range" id="sfx-volume" min="0" max="100" value="50">
-                </div>
-
                 <div class="ss-cat">Site background</div>
                 <div class="ss-row ss-row-inline">
                     <label class="btn btn-secondary btn-icon file-btn" aria-label="Upload background image" title="Upload image">
@@ -531,9 +521,8 @@
                         <span class="panel-profile-login-title">Not signed in</span>
                         <span class="panel-profile-login-sub">Log in or register to save, publish &amp; add custom skins</span>
                     </button>
-                    <a id="panel-profile-home" href="/" title="Back to Corruption Corp" aria-label="Back to Corruption Corp" data-tilt>
-                        <img src="/pinball/ui/cclogo.png" alt="Corruption Corp" draggable="false">
-                        <span class="ph-confirm" aria-hidden="true">EXIT?</span>
+                    <a id="panel-profile-home" href="/" title="Music player" aria-label="Music player" data-tilt>
+                        <img src="/hud/mp3-button.svg" alt="Music player" draggable="false">
                     </a>
                 </div>
             </div>
@@ -634,6 +623,7 @@
             </div>
             </div></div>
     </div>
-
+
+    <script src="/hud/mp3-host.js"></script>
 </body>
 </html>
