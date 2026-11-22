@@ -154,6 +154,11 @@ body{
   display:block;
   z-index:0;
   touch-action:none;       /* the app owns pan/zoom on the canvas, not the browser */
+  /* While the phone's knob sheet slides, the box and the ring are briefly
+     different shapes (see glFit in the script): `cover` shows the ring's
+     centre at 1:1 in the box, never a stretched frame. At rest the two match
+     and this does nothing. */
+  object-fit:cover;
 }
 
 /* ---------- hud shell ---------- */
@@ -302,6 +307,8 @@ body{
   pointer-events:none;
   -webkit-user-drag:none;
 }
+/* A knob's written name — only the phone sheet shows it (see there). */
+.cell .cap{ display:none }
 .cell .glyph{
   position:absolute;
   left:19%; top:19%; width:62%; height:62%;
@@ -1168,10 +1175,22 @@ body{
      to the real viewport). Hidden below the fold by default; .knobs-open
      (toggled by the logo, see the script) slides it up "in front of" the
      bottom of the canvas rather than pushing anything. */
+  /* The rainbow knob's size and resting height, shared by the dock and the
+     legend that stack above it. The height is NOT just the safe area: the
+     bottom ~20px of a phone is the system's (iOS home-indicator swipe, the
+     browser's own bottom toolbar), and a control sitting in it loses taps to
+     the OS or turns a drag-up into "close the app". So it keeps 16px off the
+     edge even where the safe area reports 0, and 8px over it where it doesn't. */
+  :root{
+    --kh-size:58px;
+    --kh-bottom:max(16px, calc(env(safe-area-inset-bottom, 0px) + 8px));
+    --kh-top:calc(var(--kh-bottom) + var(--kh-size) + 12px);
+  }
   #knobPanel{
-    /* Pinned to what the sheet was tuned at — :root's --cell is the bigger
-       desktop/landscape size and would blow the rows out on a phone. */
-    --cell: 42px;
+    /* Seven equal columns (a group's header + up to six knobs) across the
+       phone's width, so every row lines up and nothing scrolls sideways; the
+       size follows the screen, from 36px on a 320px phone to 54px on a big one. */
+    --cell: clamp(36px, calc((100vw - 24px) / 7 - 9px), 54px);
     position:fixed; left:0; right:0; bottom:0; top:auto;
     flex-direction:column;
     align-items:stretch;
@@ -1180,8 +1199,8 @@ body{
        Row pitch is unchanged — the 14px that was here moved into the rows. */
     gap:0;
     margin:0;
-    padding:14px 16px calc(14px + env(safe-area-inset-bottom, 0px));
-    max-height:62vh;
+    padding:14px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+    max-height:66vh;
     overflow-y:auto;
     overflow-x:hidden;
     -webkit-overflow-scrolling:touch;
@@ -1195,51 +1214,109 @@ body{
     z-index:6;
   }
   .hud.knobs-open #knobPanel{ transform:translateY(0) }
-  /* The pull bar. Pinned to the viewport's bottom edge, it rides the sheet's
-     top edge as the sheet opens: its translate is the sheet's height times the
-     open fraction (--sheet-h is measured by the script). While a finger is on
-     it the script writes both transforms inline and .knobs-dragging drops the
-     transitions, so the sheet tracks the finger 1:1. */
+  /* The viewport ends at the open sheet's top edge — the script writes its
+     height (glFit); this is the same slide as the sheet's. */
+  #gl{ transition:height .3s ease }
+  /* The RAINBOW KNOB — the sheet's toggle (it replaced a full-width pull bar
+     on the screen's bottom edge, 2026-11-23). It is the console's own knob art
+     greyed like the Controls strip, with the red ring painted over in the
+     brand colours: every group's knob in one. Tap to open/close; a drag still
+     works. Shut, it rests centred above the system strip (--kh-bottom); open,
+     it rides the sheet's top edge, its centre ON that edge (the script moves
+     it — placeSheet — by the same amount as the sheet), and the hand sweeps
+     from "off" to "on".
+     It lives OUTSIDE .hud on purpose: the hud fades to opacity 0 with
+     pointer-events off two seconds after the last touch, and the toggle that
+     brings the knobs back must not vanish with it — a tap where it used to be
+     fell through to the canvas. Its state classes (.open/.dragging/.idle/
+     .photo) are mirrored from the hud by the script. */
   #knobHandle{
-    display:flex; align-items:center; justify-content:center;
-    position:fixed; left:0; right:0; bottom:0;
-    height:calc(34px + env(safe-area-inset-bottom, 0px));
-    padding-bottom:env(safe-area-inset-bottom, 0px);
-    box-sizing:border-box;
-    background:#fff;
-    border-top-left-radius:16px;
-    border-top-right-radius:16px;
-    box-shadow:0 -4px 16px rgba(0,0,0,.4);
+    position:fixed; left:50%; bottom:var(--kh-bottom);
+    width:var(--kh-size); height:var(--kh-size);
+    margin-left:calc(var(--kh-size) / -2);
+    border-radius:50%;
     touch-action:none;
-    cursor:grab;
-    transition:transform .3s ease, border-radius .3s ease, box-shadow .3s ease;
-    z-index:7;
+    cursor:pointer;
+    z-index:11;                        /* over .hud (10), which it sits outside */
+    filter:drop-shadow(0 2px 8px rgba(0,0,0,.65));
+    transition:transform .3s ease, opacity var(--hud-fade);
   }
-  #knobHandle::before{
-    content:""; width:44px; height:5px; border-radius:3px; background:#505050;
+  /* Idle: still there and still tappable, just quieter, so the fractal has
+     the screen. Photo mode means a clean frame, so there it goes entirely. */
+  #knobHandle.idle{ opacity:.55 }
+  #knobHandle.photo{ opacity:0; pointer-events:none }
+  #knobHandle img, #knobHandle .kh-ring{
+    position:absolute; inset:0; width:100%; height:100%;
+    pointer-events:none;
   }
-  .hud.knobs-open #knobHandle{ box-shadow:none }
+  #knobHandle .kh-base{ filter:grayscale(1) brightness(1.06) }
+  /* The ring band of knob-base-red.png, measured: red from 82.6% to 91.7% of
+     the radius, a black outline outside it. The mask paints exactly that
+     band, so the art's outline and face show round it unchanged. */
+  #knobHandle .kh-ring{
+    border-radius:50%;
+    background:
+      radial-gradient(closest-side, rgba(255,255,255,0) 84%, rgba(255,255,255,.35) 87%, rgba(0,0,0,0) 90%, rgba(0,0,0,.28) 92%),
+      conic-gradient(#dc0701, #dab100, #00db4b, #0108dc, #2e3087, #e70090, #dc0701);
+    -webkit-mask:radial-gradient(closest-side, transparent 81.8%, #000 82.8%, #000 91.6%, transparent 92.4%);
+            mask:radial-gradient(closest-side, transparent 81.8%, #000 82.8%, #000 91.6%, transparent 92.4%);
+  }
+  /* The hand: white with the art's black outline, swept off -> on. */
+  #knobHandle .kh-hand{
+    filter:grayscale(1) brightness(3.2);
+    transform:rotate(-135deg);
+    transition:transform .3s ease;
+  }
+  #knobHandle.open .kh-hand{ transform:rotate(135deg) }
+  #knobHandle:focus-visible{ outline:2px solid #fff; outline-offset:3px }
   .hud.knobs-dragging #knobPanel,
-  .hud.knobs-dragging #knobHandle{ transition:none }
-  /* Open, the bar sits over the top of the sheet — this padding is the room
-     it takes, so it never covers the first row. */
-  /* Room for the visible TAB (17px + safe area, see #knobHandle::after), which
-     overlaps the open sheet's top; the handle's taller grab area sits above. */
-  #knobPanel{ padding-top:calc(17px + env(safe-area-inset-bottom, 0px) + 6px) }
-  /* Each group becomes its own horizontally-scrollable row: header icon
-     first (unchanged from desktop), its knobs trailing after it. */
+  #knobHandle.dragging,
+  #knobHandle.dragging .kh-hand{ transition:none }
+  /* Open, the knob's lower half overlaps the sheet's top, centred — this is
+     the room it takes, so it never covers the first row. */
+  #knobPanel{ padding-top:calc(var(--kh-size) / 2 + 4px) }
+  /* Each group is one row on a seven-column grid: its header first (its name
+     written under it in the group's colour), then its knobs, each NAMED
+     underneath (.cap) — so a phone can read what a knob is without pressing
+     it first. Every row fits the width, so the columns line up down the
+     sheet and nothing scrolls sideways; the sheet itself scrolls if a short
+     phone runs out of height. */
   #knobPanel .col{
-    flex-direction:row;
-    align-items:center;
+    display:grid;
+    grid-template-columns:repeat(7, minmax(0, 1fr));
+    justify-items:center;
+    align-items:start;
+    gap:0;
     width:100%;
-    overflow-x:auto;
-    overflow-y:hidden;
-    -webkit-overflow-scrolling:touch;
-    touch-action:pan-x;
-    /* A scroll container clips at its PADDING box, so without this the hit
-       pads above/below each cell would be clipped straight back off. Keep in
-       step with --hit. */
-    padding:7px 0;
+    overflow:visible;
+    touch-action:pan-y;
+    /* Kept tight: the open sheet lifts the timeline dock on its edge, and much
+       taller than this puts the dock's toggle onto the controls strip on an
+       ordinary (812px) phone, not just a short one. */
+    padding:6px 0 3px;
+  }
+  #knobPanel .col + .col{ border-top:1px solid #eceef2 }
+  /* On white the console's heavy drop-shadow only muddies the art. */
+  #knobPanel .cell{ filter:none; margin-bottom:13px }
+  #knobPanel .cap{
+    display:block;
+    position:absolute; left:50%; top:calc(100% + 2px);
+    width:calc(100% + 10px); margin-left:calc(-50% - 5px);
+    /* A system face, not CRENZO: CRENZO is wide enough that "Kaleido" alone
+       is 46px at 7px — wider than a column, and unreadable at that size. */
+    font:600 9.5px/1.1 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color:#3b404a;
+    text-align:center;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:clip;
+    pointer-events:none;
+  }
+  #knobPanel .cell.hdr .cap, #knobPanel .cell.grp .cap{
+    color:var(--accent, #3b404a);
+    font-size:8.5px; font-weight:700;
+    letter-spacing:.06em;
+    text-transform:uppercase;
   }
   /* .cell::after / :focus-visible are a WHITE ring — right everywhere else
      (dark canvas showing through), invisible against #knobPanel's white
@@ -1282,7 +1359,8 @@ body{
        #controlsBar is pulled onto the same 15px below. */
     left:15px; right:18px;
     gap:15px;
-    bottom:calc(34px + env(safe-area-inset-bottom, 0px) + 12px);
+    /* Above the rainbow knob, which owns the bottom centre. */
+    bottom:var(--kh-top);
     z-index:7;
     transition:transform .3s ease;
   }
@@ -1309,50 +1387,27 @@ body{
     transform:translateY(6px);
   }
   .hud.tl-open #legend.show{ transform:translateY(0) }
-  /* ONE drag-bar look for the three things dragged by their top edge on a
-     phone — the timeline panel (#tlGrip, the model), the legend and the knob
-     sheet's pull bar: a 44x4 pale-grey bar, black while held. The legend's
-     straddles its top border like the timeline's does. */
+  /* ONE drag-bar look for the things dragged by their top edge on a phone —
+     the timeline panel (#tlGrip, the model) and the legend (the knob sheet's
+     pull bar was the third, until the rainbow knob replaced it): a 44x4
+     pale-grey bar, black while held. The legend's straddles its top border
+     like the timeline's does. */
   #lgGrip{ top:-7px; height:14px }
   #lgGrip::after{ top:5px; width:44px; height:4px; margin-left:-22px; border-radius:2px; background:#c9ced6 }
-  /* Centred ON the tab's top border (like #tlGrip / #lgGrip: bar middle on
-     the edge), not in the middle of the 34px tab. */
-  /* The tab you SEE is half the handle's height, shadowless, drawn by ::after
-     along the handle's bottom; the handle itself stays the full 34px (+ the
-     safe area) and transparent, so the touch target is unchanged. The bar
-     straddles the visible tab's top edge. */
-  #knobHandle{ --tab-h:calc(17px + env(safe-area-inset-bottom, 0px)) }
-  #knobHandle::after{
-    content:""; position:absolute; left:0; right:0; bottom:0;
-    height:var(--tab-h);
-    background:#fff;
-    border:1px solid #6b7280; border-bottom:0;
-    border-top-left-radius:8px; border-top-right-radius:8px;
-    box-sizing:border-box;
-  }
-  #knobHandle::before{
-    position:absolute; left:50%; top:calc(100% - var(--tab-h) - 2px); margin-left:-22px;
-    width:44px; height:4px; border-radius:2px; background:#c9ced6; z-index:1;
-  }
-  .hud.knobs-dragging #knobHandle::before{ background:#000 }
-  /* ...and the sheet and its pull tab in the timeline panel's clothes too:
-     white card, 1px grey ring, 8px corners, the panel's shadow — so the three
-     drag-by-the-top surfaces read as one family. The tab's ring has no bottom
-     edge, it runs into the sheet. */
+  /* ...and the sheet in the timeline panel's clothes too: white card, 1px
+     grey ring, 8px corners, the panel's shadow — so they read as one family. */
   #knobPanel{
     border:1px solid #6b7280; border-bottom:0;
     border-top-left-radius:8px; border-top-right-radius:8px;
     box-shadow:0 2px 8px rgba(0,0,0,.65);
   }
-  #knobHandle{ background:transparent; border:0; box-shadow:none }
-  .hud.knobs-open #knobHandle::after{ border-color:transparent }
   /* With the timeline SHUT the legend takes the panel's own place — same
      column, same bottom edge (--tl-base: the dock's bottom, riding the sheet
      like the panel would) — rather than floating mid-screen, so it is always
      found in the one spot. */
   .hud:not(.tl-open) #legend{
     top:auto; left:66px; right:18px;
-    bottom:var(--tl-base, calc(34px + env(safe-area-inset-bottom, 0px) + 12px));
+    bottom:var(--tl-base, var(--kh-top));
     transform:translateY(6px);
   }
   .hud:not(.tl-open) #legend.show{ transform:translateY(0) }
@@ -1363,13 +1418,12 @@ body{
   .fc-splash-loader,.hud.tl-open #tlPanel{animation:none}
 }
 @media (prefers-reduced-motion:reduce) and (max-width:900px) and (orientation:portrait){
-  #knobPanel,#knobHandle,#tlDock{transition:none}
+  #knobPanel,#knobHandle,#tlDock,#gl{transition:none}
 }
-/* The pull bar only exists where the sheet does (the portrait block shows it
-   with .hud #knobHandle, which outranks this). */
+/* The rainbow knob only exists where the sheet does (same query). */
 #knobHandle{display:none}
 @media (max-width:900px) and (orientation:portrait){
-  .hud #knobHandle{display:flex}
+  #knobHandle{display:block}
 }
 </style>
 </head>
@@ -1395,7 +1449,6 @@ body{
       <div id="controlsBar" class="col g-controls"></div>
       <div id="knobPanel"></div>
     </div>
-    <div id="knobHandle" role="button" tabindex="0" aria-expanded="false" aria-label="Drag up for controls"></div>
     <!-- LAST in the bar on purpose: on a phone #topBar is a real flex row, so
          DOM order is what puts this at the right-hand end, and on every other
          viewport it positions itself into the top-right corner anyway.
@@ -1496,6 +1549,16 @@ body{
   </div>
 </div>
 
+<!-- The phone's way into the knob sheet: one knob in the console's own art,
+     greyed, with a rainbow ring in the brand colours. Tap to open/close (it
+     can still be dragged). Only shown in phone portrait (see its CSS). It is a
+     SIBLING of .hud, like #photoHint, so the hud's idle fade (opacity 0 and no
+     pointer events) cannot take away the one way back to the knobs. -->
+<div id="knobHandle" role="button" tabindex="0" aria-expanded="false" aria-label="Show the knobs">
+  <img class="kh-base" src="/fractalcrack/assets/knob-base-red.png" alt="">
+  <span class="kh-ring"></span>
+  <img class="kh-hand" src="/fractalcrack/assets/knob-hand-red.png" alt="">
+</div>
 <div id="photoHint" role="status" aria-live="polite"></div>
 
 <input type="file" id="fileIn" accept="image/png,image/jpeg,image/webp" hidden>
@@ -1753,11 +1816,21 @@ void main(){
    LINEAR filter) so that resizing the window, moving Resolution or Delay, or
    the adaptive quality below does not throw the frame away and start again
    from noise. */
+/* uScale is new size / old size per axis, in CSS pixels: the new frame is the
+   OLD one's centre at the same on-screen scale (cropped when it shrinks), not
+   the whole old frame stretched to the new shape. Where the new frame is
+   bigger, the old picture is MIRRORED out past its edges, so the band the
+   phone's knob sheet hands back reads as more fractal, not a smear or black. */
 const FRAG_COPY = `#version 300 es
 precision highp float;
 in vec2 v; out vec4 o;
 uniform sampler2D uTex;
-void main(){ o = vec4(texture(uTex, v).rgb, 1.0); }`;
+uniform vec2 uScale;
+void main(){
+  vec2 u = 0.5 + (v - 0.5) * uScale;
+  u = 1.0 - abs(1.0 - mod(u, 2.0));
+  o = vec4(texture(uTex, u).rgb, 1.0);
+}`;
 
 const FRAG_DISPLAY = `#version 300 es
 precision highp float;
@@ -1870,7 +1943,7 @@ function initGL(){
 
   U.seed = { time:uni(progSeed,"uTime"), aspect:uni(progSeed,"uAspect") };
   U.disp = { tex:uni(progDisp,"uTex"), px:uni(progDisp,"uPx"), bloom:uni(progDisp,"uBloom"), scan:uni(progDisp,"uScan"), lines:uni(progDisp,"uLines") };
-  U.copy = { tex:uni(progCopy,"uTex") };
+  U.copy = { tex:uni(progCopy,"uTex"), scale:uni(progCopy,"uScale") };
   U.fb = {};
   ["uPrev","uDelay","uCustom","uCenter","uPx","uTime","uAspect","uZoom","uRot","uWarp","uPan",
    "uBright","uContrast","uSat","uHue","uGain","uSharp","uBleed","uDelayMix","uEdge","uKaleido",
@@ -1931,15 +2004,17 @@ function makeTarget(w, h){
   return {tex, fbo};
 }
 
-/* Straight blit of one ring texture into another, at whatever size the
-   destination is — the sampler's own LINEAR filter does the scaling. */
-function copyInto(dst, srcTex, w, h){
+/* Blit of one ring texture into another, at whatever size the destination
+   is — the sampler's own LINEAR filter does the scaling. `sx`/`sy` are the
+   new/old CSS-size ratios (see FRAG_COPY); 1,1 is a straight copy. */
+function copyInto(dst, srcTex, w, h, sx, sy){
   gl.useProgram(progCopy);
   gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
   gl.viewport(0, 0, w, h);
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, srcTex);
   gl.uniform1i(U.copy.tex, 0);
+  gl.uniform2f(U.copy.scale, sx || 1, sy || 1);
   drawQuad();
 }
 
@@ -2005,11 +2080,18 @@ function tune(avg){
   }
 }
 
+/* The canvas's CSS size the ring is built for. Not the canvas's current box:
+   while the phone's knob sheet slides, that box is mid-animation, and the
+   ring is deliberately sized for where it is going (see glFit). glCut is the
+   strip at the bottom the open sheet takes from the viewport. */
+let glCut = 0, glCssW = 0, glCssH = 0;
 function allocate(){
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const scale = P.res * QUALITY[qi];
-  let w = Math.max(2, Math.round(window.innerWidth  * dpr * scale));
-  let h = Math.max(2, Math.round(window.innerHeight * dpr * scale));
+  const cssW = Math.max(1, window.innerWidth);
+  const cssH = Math.max(1, window.innerHeight - glCut);
+  let w = Math.max(2, Math.round(cssW * dpr * scale));
+  let h = Math.max(2, Math.round(cssH * dpr * scale));
   /* A phone cannot show 1280 of anything and is holding the browser and the
      rest of the page in the same GPU budget, so a coarse pointer caps lower. */
   const cap = COARSE ? 960 : 1280;
@@ -2019,6 +2101,8 @@ function allocate(){
   if(w === W && h === H && n === ring.length) return;
 
   const old = ring, oldN = old.length, oldHead = head;
+  const sx = glCssW ? cssW / glCssW : 1, sy = glCssH ? cssH / glCssH : 1;
+  glCssW = cssW; glCssH = cssH;
   const next = [];
   for(let i = 0; i < n; i++) next.push(makeTarget(w, h));
   /* Drop every binding before drawing into the new targets — and before the
@@ -2042,7 +2126,7 @@ function allocate(){
        just been lengthened reads a held frame rather than noise. */
     for(let k = 0; k < n; k++){
       const j = Math.min(k, oldN - 1);
-      copyInto(next[n - 1 - k], old[(oldHead + oldN - 1 - j) % oldN].tex, w, h);
+      copyInto(next[n - 1 - k], old[(oldHead + oldN - 1 - j) % oldN].tex, w, h, sx, sy);
     }
     head = 0;
     gl.activeTexture(gl.TEXTURE0);
@@ -2375,6 +2459,18 @@ function optionsOf(c){
   return (c.def.k === "seedShape" && hasCustom) ? o.concat(["custom"]) : o;
 }
 
+/* The phone sheet writes a name under every knob (.cap, shown only there).
+   Short forms of the legend's labels, because a column is about 50px wide;
+   anything not listed uses its full label. The legend still gives the full
+   name and the value on a press. */
+const CAPTION = {
+  rot:"Rotate", warp:"Warp", bright:"Bright", sat:"Colour", hue:"Hue",
+  decay:"Gain", bleed:"Bleed", delayFrames:"Delay", delayMix:"Blend",
+  edge:"Edge", kaleido:"Kaleido", seedAmt:"Inject", seedSize:"Size",
+  seedDrift:"Motion", seedShape:"Shape", scan:"Scan", iters:"Loops",
+  res:"Res", sharp:"Sharp"
+};
+
 function img(src, cls){
   const e = document.createElement("img");
   e.src = "/fractalcrack/assets/" + src;
@@ -2389,13 +2485,16 @@ GROUPS.forEach(g => {
   // straight into #console.
   const isControls = g.id === "controls";
   const col = isControls ? controlsBarEl : document.createElement("div");
-  if(!isControls) col.className = "col g-" + g.id;
+  if(!isControls){
+    col.className = "col g-" + g.id;
+    col.style.setProperty("--accent", g.accent);   // the phone sheet's header captions
+  }
 
   g.items.forEach(def => {
     /* a header is inert unless it carries an action of its own */
     const inert = (def.t === "hdr" && !def.act);
     const cell = document.createElement(inert ? "div" : "button");
-    cell.className = "cell" + (inert ? " hdr" : "");
+    cell.className = "cell" + (inert ? " hdr" : "") + (def.t === "hdr" ? " grp" : "");
     if(!inert){ cell.type = "button"; }
 
     const obj = {def, group:g, el:cell, hand:null};
@@ -2413,6 +2512,14 @@ GROUPS.forEach(g => {
       obj.glyph = glyph;
       cell.setAttribute("aria-label", def.aria || def.label);
       if(inert) cell.setAttribute("role", "img");
+    }
+
+    if(!isControls){
+      const cap = document.createElement("span");
+      cap.className = "cap";
+      cap.setAttribute("aria-hidden", "true");
+      cap.textContent = def.t === "hdr" ? g.name : (CAPTION[def.k] || def.label);
+      cell.appendChild(cap);
     }
 
     col.appendChild(cell);
@@ -2957,9 +3064,11 @@ fileIn.addEventListener("change", () => {
 let leftDown = false, rightDown = false;
 const anyDown = () => leftDown || rightDown;
 
+/* Relative to the canvas's own box: on a phone it is shorter than the window
+   while the knob sheet is open. Its top-left is always the screen's. */
 function placeSeed(e){
-  seedAnchor.x = Math.min(1, Math.max(0, e.clientX / window.innerWidth));
-  seedAnchor.y = Math.min(1, Math.max(0, e.clientY / window.innerHeight));
+  seedAnchor.x = Math.min(1, Math.max(0, e.clientX / (cvs.clientWidth  || window.innerWidth)));
+  seedAnchor.y = Math.min(1, Math.max(0, e.clientY / (cvs.clientHeight || window.innerHeight)));
 }
 function duckHud(){
   // The knob sheet is something you are working IN, not a label glanced at —
@@ -3000,12 +3109,23 @@ cvs.addEventListener("pointercancel", () => {
   leftDown = rightDown = false; drawHold = 0; wake();
 });
 
-cvs.addEventListener("dblclick", () => {
+/* Double-click (double-TAP on a phone, see "Double-tap" below): out of photo
+   mode if in it, else the seed goes back to the centre. */
+let lastDoubleAt = -1e9;             // performance.now() of the last one handled
+function canvasDouble(){
+  lastDoubleAt = performance.now();
   // A phone has no Escape key, so a double-tap is photo mode's way out there.
   // It takes priority: recentring the seed is not what someone staring at a
   // hidden hud is trying to do.
   if(photoMode){ exitPhoto(); return; }
   seedAnchor.x = 0.5; seedAnchor.y = 0.5;
+}
+cvs.addEventListener("dblclick", () => {
+  /* Some phones DO send a dblclick after a double-tap, on top of the one
+     detected below. Answering both would exit photo mode and then recentre
+     the seed, so a second one this soon is ignored. */
+  if(performance.now() - lastDoubleAt < 600) return;
+  canvasDouble();
 });
 
 /* Touch has no right button, so a SECOND simultaneous touch stands in for it
@@ -3037,6 +3157,40 @@ function releaseTouch(e){
 }
 cvs.addEventListener("pointerup", releaseTouch);
 cvs.addEventListener("pointercancel", releaseTouch);
+
+/* Double-tap. Mobile browsers don't reliably turn two taps into a dblclick:
+   iOS Safari mostly doesn't, and the canvas's touch-action:none and pointer
+   capture make it less likely everywhere. So a double-tap resetting the seed
+   (and photo mode's "double-tap to exit") were desktop-only in practice. It is
+   detected here from the touches themselves: two quick, still taps close
+   together, one finger only. A second finger joining (the two-finger inject)
+   or a drag in between cancels it. */
+const TAP_MAX_MS = 260;              // a press longer than this is a hold, not a tap
+const TAP_SLOP = 14;                 // px a tap may wander
+const DTAP_GAP_MS = 350;             // first tap's release to the second's
+const DTAP_PX = 44;                  // how far apart the two taps may land
+let tapDown = null, lastTap = null;
+cvs.addEventListener("pointerdown", e => {
+  if(e.pointerType !== "touch") return;
+  // touchIds already counts this finger (its listener is registered above).
+  if(touchIds.size > 1){ tapDown = null; lastTap = null; return; }
+  tapDown = { id: e.pointerId, x: e.clientX, y: e.clientY, t: e.timeStamp };
+});
+cvs.addEventListener("pointerup", e => {
+  if(e.pointerType !== "touch" || !tapDown || tapDown.id !== e.pointerId) return;
+  const d = tapDown; tapDown = null;
+  const tap = e.timeStamp - d.t < TAP_MAX_MS &&
+              Math.hypot(e.clientX - d.x, e.clientY - d.y) < TAP_SLOP;
+  if(!tap){ lastTap = null; return; }
+  if(lastTap && e.timeStamp - lastTap.t < DTAP_GAP_MS &&
+     Math.hypot(d.x - lastTap.x, d.y - lastTap.y) < DTAP_PX){
+    lastTap = null;
+    canvasDouble();
+  } else {
+    lastTap = { x: d.x, y: d.y, t: e.timeStamp };
+  }
+});
+cvs.addEventListener("pointercancel", () => { tapDown = null; lastTap = null; });
 
 /* ------------------------------------------------------------------ */
 /*  Idle auto-hide                                                     */
@@ -3096,12 +3250,14 @@ function enterPhoto(){
   hud.classList.add("idle");
   clearTimeout(idleTimer);
   showPhotoHint();
+  glFit();                            // a clean frame is a FULL frame
 }
 function exitPhoto(){
   if(!photoMode) return;
   photoMode = false;
   clearTimeout(photoHintTimer);
   photoHint.classList.remove("show");
+  glFit();                            // back above the sheet, if it is open
   wake();
 }
 
@@ -3140,24 +3296,60 @@ function wake(){
 wake();
 
 /* ------------------------------------------------------------------ */
-/*  Pull bar — mobile-portrait knob sheet                              */
-/*  Only shown under the portrait media query (see the CSS). Hold and   */
-/*  drag it up to open the sheet, down to close; the sheet follows the  */
-/*  finger 1:1 and settles open or shut on release by position, or by   */
-/*  direction on a flick. A plain tap toggles.                          */
+/*  Rainbow knob — mobile-portrait knob sheet                          */
+/*  Only shown under the portrait media query (see the CSS). A tap      */
+/*  opens/closes the sheet. It can also be dragged: the sheet follows   */
+/*  the finger 1:1 and settles open or shut on release by position, or  */
+/*  by direction on a flick.                                            */
 /* ------------------------------------------------------------------ */
 const knobHandle = document.getElementById("knobHandle");
+const khHand = knobHandle.querySelector(".kh-hand");
 const FLICK_PX_MS = 0.4;     // release faster than this settles by direction
-const TAP_SLOP_PX = 6;       // moved less than this: it was a tap
-// How far the bar travels: from the screen's bottom edge to the sheet's top.
-/* The TAB you see is only the bottom part of the handle (its ::after — the
-   rest is transparent grab area), so everything is measured off the tab's
-   height: the tab's top edge, where the bar sits, and the sheet's top edge
-   are kept on the SAME line at every point of a drag, open and shut. */
-function sheetTabH(){
-  return parseFloat(getComputedStyle(knobHandle, "::after").height) || knobHandle.offsetHeight;
+const TAP_SLOP_PX = 10;      // moved less than this: it was a tap (a thumb wobbles)
+/* The knob sits OUTSIDE .hud (so the hud's idle fade cannot take it away —
+   see its CSS), so the hud's state is mirrored onto it: dimmed while the hud
+   is idle, gone in photo mode. One observer catches every path that sets
+   .idle (the timer, duckHud, photo mode) rather than touching each. */
+function syncKnobHandle(){
+  knobHandle.classList.toggle("idle", hud.classList.contains("idle"));
+  knobHandle.classList.toggle("photo", photoMode);
 }
-function sheetTravel(){ return Math.max(0, knobPanelEl.offsetHeight - sheetTabH()); }
+new MutationObserver(syncKnobHandle).observe(hud, { attributes: true, attributeFilter: ["class"] });
+syncKnobHandle();
+/* How far up the knob's CENTRE sits from the screen's bottom edge. The knob's
+   centre and the sheet's top edge are kept on the SAME line at every point of
+   a drag, so open, the knob straddles the sheet's top edge. */
+function sheetTabH(){
+  return (parseFloat(getComputedStyle(knobHandle).bottom) || 0) + knobHandle.offsetHeight / 2;
+}
+let khTabH = 0;                 // sheetTabH() as of the last sheetTravel()
+function sheetTravel(){ khTabH = sheetTabH(); return Math.max(0, knobPanelEl.offsetHeight - khTabH); }
+/* ---------- the viewport gives way to the open sheet ----------
+   On a phone the fractal's viewport (the canvas) ends at the open sheet's top
+   edge rather than running on underneath it, so the whole picture, and its
+   centre, the vanishing point, stays in view; shut, it is full screen again.
+   The BOX animates with the sheet (CSS height, same .3s; inline 1:1 while
+   dragging) and `object-fit: cover` shows the ring's centre at 1:1 inside
+   it. The RING (the render targets) is reallocated only at the ends of the
+   move, always to the LARGER size first: growing, it is rebuilt at once and
+   the box grows over it; shrinking, the box shrinks first and the ring
+   follows when the slide is done. Either way nothing on screen is ever
+   stretched, zoomed, or rebuilt mid-slide. Photo mode is a clean full
+   frame, so it never cuts (the sheet is invisible there anyway). */
+let glFitTimer = null;
+const GL_FIT_MS = 320;          // the sheet's .3s slide, and a frame to spare
+function glBox(cut, dragging){
+  cvs.style.transition = dragging ? "none" : "";
+  cvs.style.height = cut > 0 ? "calc(100% - " + cut + "px)" : "";
+}
+function glFit(){
+  const cut = (SHEET_MQ.matches && hud.classList.contains("knobs-open") && !photoMode)
+    ? knobPanelEl.offsetHeight : 0;
+  glBox(cut, false);
+  clearTimeout(glFitTimer);
+  if(cut < glCut){ glCut = cut; allocate(); }                                 // growing: ring first
+  else if(cut > glCut) glFitTimer = setTimeout(() => { glCut = cut; allocate(); }, GL_FIT_MS);  // shrinking: ring last
+}
 // f = 0 shut, 1 open. The sheet is only written inline mid-drag; at rest its
 // class-driven CSS owns it (so the 105% hide still clears its shadow).
 /* Mid-drag the travel comes in from the drag, measured once at pointerdown:
@@ -3168,14 +3360,20 @@ function sheetTravel(){ return Math.max(0, knobPanelEl.offsetHeight - sheetTabH(
 function placeSheet(f, dragging, travel){
   if(travel === undefined) travel = sheetTravel();
   knobHandle.style.transform = `translateY(${-f * travel}px)`;
+  // The hand sweeps off -> on with the sheet (its CSS owns it at rest).
+  khHand.style.transform = dragging ? `rotate(${(-135 + 270 * f).toFixed(1)}deg)` : "";
+  // The viewport's bottom follows the sheet under a finger; at rest, glFit.
+  if(dragging) glBox(Math.round(f * (travel + khTabH)), true);
+  else glFit();
   // The sheet's top rides the tab's top: shut, it tucks exactly under the tab.
   knobPanelEl.style.transform = dragging ? `translateY(${(1 - f) * travel}px)` : "";
   tlRide(f * travel, !dragging);       // the timeline dock rides the sheet's edge too
 }
 function setKnobsOpen(open){
   hud.classList.toggle("knobs-open", open);
+  knobHandle.classList.toggle("open", open);
   knobHandle.setAttribute("aria-expanded", String(open));
-  knobHandle.setAttribute("aria-label", open ? "Drag down to hide controls" : "Drag up for controls");
+  knobHandle.setAttribute("aria-label", open ? "Hide the knobs" : "Show the knobs");
   placeSheet(open ? 1 : 0, false);
   // Opening cancels any idle countdown already scheduled (wake() won't set a
   // new one while the sheet is up); closing starts one again from here.
@@ -3189,8 +3387,13 @@ function setKnobsOpen(open){
              lastY: e.clientY, lastT: e.timeStamp, v: 0, moved: false, travel: sheetTravel() };
     drag.f = drag.f0;
     tlSyncTop();                       // the dock's resting place, measured once for the drag
+    /* The viewport may grow under this drag: give it the full-size ring now
+       (see glFit), so the box can grow over real pixels rather than zoom. */
+    clearTimeout(glFitTimer);
+    if(glCut > 0){ glCut = 0; allocate(); }
     try{ knobHandle.setPointerCapture(e.pointerId); }catch(_){}   // as everywhere else: a throw must not strand the drag half set up
     hud.classList.add("knobs-dragging");
+    knobHandle.classList.add("dragging");
     wake();
   });
   knobHandle.addEventListener("pointermove", e => {
@@ -3209,6 +3412,7 @@ function setKnobsOpen(open){
     // Measure the release BEFORE the transitions come back, so the settle animates.
     void knobPanelEl.offsetHeight;
     hud.classList.remove("knobs-dragging");
+    knobHandle.classList.remove("dragging");
     let open;
     if(cancelled)                             open = d.f0 === 1;
     else if(!d.moved)                         open = d.f0 !== 1;           // tap toggles
