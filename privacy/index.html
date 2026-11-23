@@ -1,0 +1,291 @@
+<!--
+  The site's privacy policy, served directly at corruptioncorp.net/privacy/.
+  A plain static page, not an app route: it is what Google's OAuth consent
+  screen (and anyone else) links to, so it must load without the 3D shell.
+  Hand-edited here (data/site is Vite's publicDir, copied verbatim into dist/).
+  "privacy" is in RESERVED (vite.config.js + tools/deploy.py) so an artist
+  folder can never take the path.
+
+  NEVER put either owner email address in this file: tools/deploy.py refuses
+  to publish a build that contains one. The public contact address is the one
+  in data/contact.txt.
+
+  Keep it TRUE: if the site starts collecting something new (a form, an
+  embed, an analytics script), add it here and bump the date.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Privacy Policy — Corruption Corp</title>
+<meta name="description" content="What Corruption Corp collects when you use corruptioncorp.net, why, who it is shared with, and how to delete it." />
+<link rel="canonical" href="https://corruptioncorp.net/privacy/" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Corruption Corp" />
+<meta property="og:title" content="Privacy Policy — Corruption Corp" />
+<meta property="og:url" content="https://corruptioncorp.net/privacy/" />
+<meta name="theme-color" content="#000000" />
+<link rel="icon" type="image/png" href="/favicon.png" />
+<script>
+  // The site's own theme choice (the phone menu's star), so this page opens
+  // in the same theme the visitor left the site in.
+  try {
+    if (localStorage.getItem('cc-dark') === '1') document.documentElement.classList.add('dark')
+  } catch (e) {}
+</script>
+<style>
+  @font-face {
+    font-family: 'Robotica';
+    src: url('/fonts/Robotica.ttf') format('truetype');
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'Pixeloid Sans';
+    src: url('/fonts/PixeloidSans-Bold.otf') format('opentype');
+    font-weight: 700;
+    font-display: swap;
+  }
+  :root {
+    --bg: #fff;
+    --fg: #000;
+    --muted: #555;
+    --rule: #000;
+    --link: #0108dc;
+    --accent: #e70090;
+  }
+  :root.dark {
+    --bg: #000;
+    --fg: #fff;
+    --muted: #aaa;
+    --rule: #fff;
+    --link: #6f8bff;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--bg); }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 400 17px/1.6 ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+  main {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 40px 16px 80px;
+  }
+  .back {
+    display: inline-block;
+    margin-bottom: 28px;
+    color: var(--fg);
+    font: 700 14px/1 'Pixeloid Sans', ui-monospace, monospace;
+    text-decoration: none;
+    border: 3px solid var(--rule);
+    border-radius: 10px;
+    padding: 10px 14px;
+  }
+  .back:hover, .back:focus-visible { background: var(--fg); color: var(--bg); }
+  h1 {
+    margin: 0 0 6px;
+    font: 400 clamp(34px, 8vw, 56px)/1 'Robotica', ui-sans-serif, system-ui, sans-serif;
+    text-transform: uppercase;
+    overflow-wrap: anywhere;
+  }
+  .updated { margin: 0 0 32px; color: var(--muted); }
+  h2 {
+    margin: 40px 0 10px;
+    padding-top: 14px;
+    border-top: 3px solid var(--rule);
+    font: 700 18px/1.3 'Pixeloid Sans', ui-monospace, monospace;
+    text-transform: uppercase;
+  }
+  h3 { margin: 22px 0 6px; font-size: 17px; }
+  p, ul { margin: 0 0 14px; }
+  ul { padding-left: 22px; }
+  li { margin-bottom: 6px; }
+  a { color: var(--link); overflow-wrap: anywhere; }
+  .lead {
+    border-left: 6px solid var(--accent);
+    padding: 4px 0 4px 14px;
+    font-size: 18px;
+  }
+  footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<main>
+  <a class="back" href="/">&larr; CORRUPTION CORP</a>
+  <h1>Privacy Policy</h1>
+  <p class="updated">Last updated 23 November 2026</p>
+
+  <p class="lead">
+    Short version: we collect as little as we can. We don't sell your data, we don't run ads,
+    and we don't use analytics or tracking cookies. You can delete your account and what's
+    tied to it at any time from your profile.
+  </p>
+
+  <p>
+    This policy covers <a href="https://corruptioncorp.net/">corruptioncorp.net</a>, including the
+    programs hosted on it (Pinballa, Fractal Crack and MixPass). "We" and "us" means Corruption Corp.
+    Questions go to <a href="mailto:hello@corruptioncorp.com">hello@corruptioncorp.com</a>.
+  </p>
+
+  <h2>What we collect</h2>
+
+  <h3>Your account</h3>
+  <ul>
+    <li>
+      <strong>Email address and password.</strong> To make an account you give us an email address
+      and a password. Passwords are handled by our sign-in provider (Google Firebase Authentication).
+      We never see or store them ourselves.
+    </li>
+    <li>
+      <strong>Signing in with Google.</strong> If you choose "Continue with Google", Google tells us
+      your email address. Google also sends your name and profile picture. We don't use or display
+      them, and your profile starts with a generated name instead. We never get your Google password.
+    </li>
+    <li>
+      <strong>Your public profile.</strong> The display name, profile picture and (in Pinballa)
+      description you choose are <em>public</em>. Anyone can see them next to the things you make.
+      Your email address is never shown publicly.
+    </li>
+  </ul>
+
+  <h3>Things you make or send</h3>
+  <ul>
+    <li><strong>Pinballa:</strong> machines you publish, your arcade high scores and your votes are public.
+      Machines you save without publishing stay in your browser.</li>
+    <li><strong>Grit (the graffiti wall):</strong> what you draw is public and becomes part of the shared wall.</li>
+    <li><strong>Contact form:</strong> your name, your message and your account's email address, so we can reply.</li>
+    <li><strong>Artist recruitment form:</strong> your stage name, location, occupation and what you write about yourself.</li>
+    <li><strong>Media suggestions (Chaos members):</strong> the YouTube link and note you submit.</li>
+  </ul>
+  <p>Only Corruption Corp can read contact, recruitment and media-suggestion submissions.</p>
+
+  <h3>Corruption Corp Chaos (paid membership)</h3>
+  <p>
+    Payments are handled by <a href="https://stripe.com/privacy">Stripe</a>. Your card details go
+    straight to Stripe. We never see or store them. From Stripe we keep the status of your
+    membership (for example active or cancelled), its billing dates, and the reference IDs needed
+    to manage it.
+  </p>
+
+  <h3>Collected automatically</h3>
+  <ul>
+    <li>
+      <strong>An "active today" marker.</strong> At most once a day, a signed-in account records the
+      date it was last used. We use it only to count active users.
+    </li>
+    <li>
+      <strong>Drawing on Grit without an account.</strong> To stop the free drawing allowance being
+      reset over and over, the site looks up your IP address through
+      <a href="https://www.ipify.org/">ipify</a>, scrambles it into a one-way code (a salted hash),
+      and stores only that code with your drawing allowance. We do not store your IP address itself.
+      The site also creates an anonymous session for you; it isn't linked to your name or email.
+    </li>
+    <li>
+      <strong>Hosting logs.</strong> The site is hosted on GitHub Pages. Like any web host, GitHub may
+      log your IP address and browser details when pages are requested. See
+      <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub's privacy statement</a>.
+    </li>
+  </ul>
+
+  <h3>Stored on your own device</h3>
+  <p>
+    The site keeps a few small things in your browser's local storage so it remembers you:
+    whether you're signed in, light or dark mode, player volume, Pinballa drafts and similar
+    settings. They stay on your device and you can clear them through your browser at any time.
+    We don't use advertising or tracking cookies.
+  </p>
+
+  <h2>How we use it</h2>
+  <ul>
+    <li>To run your account and sign you in across the site and its programs.</li>
+    <li>To show your public profile and the things you publish.</li>
+    <li>To reply to messages and review submissions.</li>
+    <li>To provide Chaos membership perks and manage billing.</li>
+    <li>To prevent spam and abuse (drawing allowances, one submission per person, and so on).</li>
+    <li>
+      To send you occasional Corruption Corp news by email. Every email will include a way to
+      unsubscribe, or you can ask us to stop at any time.
+    </li>
+  </ul>
+
+  <h2>Who we share it with</h2>
+  <p>
+    We don't sell or rent your personal information. We only share it with the services that run
+    the site for us:
+  </p>
+  <ul>
+    <li><strong>Google Firebase:</strong> accounts, the database and server functions (<a href="https://firebase.google.com/support/privacy">Firebase privacy</a>).</li>
+    <li><strong>Google Sign-In:</strong> only if you choose to sign in with Google (<a href="https://policies.google.com/privacy">Google privacy policy</a>).</li>
+    <li><strong>Stripe:</strong> Chaos payments.</li>
+    <li><strong>GitHub Pages:</strong> hosting.</li>
+    <li><strong>ipify:</strong> the IP lookup described above.</li>
+  </ul>
+  <p>We may also disclose information if the law requires us to.</p>
+
+  <h2>Embedded content</h2>
+  <p>
+    The Media channel and some artist pages play videos from YouTube, and the music player plays
+    tracks from SoundCloud. When those players load, YouTube and SoundCloud may collect data and set
+    cookies under their own policies:
+    <a href="https://policies.google.com/privacy">Google/YouTube</a> and
+    <a href="https://soundcloud.com/pages/privacy">SoundCloud</a>.
+    Links to social media sites (Instagram, X, YouTube) are governed by those sites' own policies.
+  </p>
+
+  <h2>How long we keep it</h2>
+  <ul>
+    <li>We keep account information until you delete your account.</li>
+    <li>
+      <strong>Deleting your account</strong> (Profile → Delete account) permanently removes your
+      login, your profile, your published Pinballa machines, your scores and votes, and your
+      activity marker. Any active Chaos membership is cancelled first.
+    </li>
+    <li>
+      Contact, recruitment and media submissions are kept until we've dealt with them. Email us to
+      have yours removed sooner.
+    </li>
+    <li>Drawings on Grit stay part of the shared wall.</li>
+  </ul>
+
+  <h2>Your choices and rights</h2>
+  <p>
+    You can see and change your display name and picture on your profile at any time, and delete
+    your account there. You can also email
+    <a href="mailto:hello@corruptioncorp.com">hello@corruptioncorp.com</a> to ask for a copy of
+    the personal information we hold about you, to correct it, to delete it or to stop us emailing
+    you. Depending on where you live you may have further rights under local law, and you can
+    complain to your local data protection authority.
+  </p>
+
+  <h2>Children</h2>
+  <p>
+    Corruption Corp is not meant for children under 13, and we don't knowingly collect personal
+    information from them. If you believe a child has made an account, email us and we'll delete it.
+  </p>
+
+  <h2>Security</h2>
+  <p>
+    Data is stored with Google Firebase and protected by access rules, so only you can change your
+    own account and only Corruption Corp can read private submissions. No system is perfectly
+    secure, but we work to protect your information and keep what we collect to a minimum.
+  </p>
+
+  <h2>Changes to this policy</h2>
+  <p>
+    If this policy changes, we'll update the date at the top of this page. If a change is
+    significant, we'll also post a notice on the site.
+  </p>
+
+  <h2>Contact</h2>
+  <p>
+    Corruption Corp &middot; <a href="mailto:hello@corruptioncorp.com">hello@corruptioncorp.com</a>
+  </p>
+
+  <footer><a href="/">corruptioncorp.net</a></footer>
+</main>
+</body>
+</html>
